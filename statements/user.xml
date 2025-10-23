@@ -1,0 +1,78 @@
+<mapper>
+
+    <select id="findUser">
+        select * from employees
+        <where>
+            <trim prefix="" prefixOverrides="AND | OR">
+                <if test="employee_id != null">
+                    employee_id in (#{employee_id})
+                </if>
+                <if test="department == nil">
+                    AND department in (1,2,3)
+                </if>
+            </trim>
+        </where>
+    </select>
+
+    <sql id="userColumns">
+        (${alias}.name, ${alias}.department, ${alias}.performance_score, ${alias}.salary)
+    </sql>
+
+    <insert id="insertAuthorMulti">
+        insert into `employees`
+        <include refid="userColumns" alias="alias" value="employees"/>
+        values
+        <foreach item="item" collection="list" separator=",">
+            <if test="item.department &lt; 3 and float(item.performance_score) &lt; 0.70">
+                (#{item.name}, #{item.department}, #{item.performance_score}, #{item.salary})
+            </if>
+            <elif test="float(item.performance_score) > 0.70">
+                (#{item.name + "B level"}, #{item.department}, #{item.performance_score}, #{item.salary})
+            </elif>
+            <else>
+                (#{item.name+"else"}, #{item.department}, #{item.performance_score}, #{item.salary})
+            </else>
+        </foreach>
+    </insert>
+
+    <select id="findById">
+        select * from employees
+        <where>
+            <if test="id != null">
+                employee_id = #{id}
+            </if>
+        </where>
+    </select>
+
+    <insert id="insertAuthor">
+        insert into employees (employee_id, name, department, performance_score, salary)
+        values (#{employee_id}, #{name}, #{department}, #{performance_score}, #{salary})
+    </insert>
+
+    <update id="updateAuthor">
+        update employees set name = #{name}
+        <where>
+            <choose>
+                <when test="id != null">
+                    employee_id = #{id}
+                </when>
+                <when test="department != null">
+                    department = #{department}
+                </when>
+                <otherwise>
+                    name = #{name}
+                </otherwise>
+            </choose>
+<!--            <trim prefix="" prefixOverrides="AND | OR">-->
+<!--                <if test="id != null">-->
+<!--                    employee_id = #{id}-->
+<!--                </if>-->
+<!--            </trim>-->
+        </where>
+    </update>
+
+    <delete id="deleteAuthor">
+        delete from employees where employee_id = #{id}
+    </delete>
+
+</mapper>

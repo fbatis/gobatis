@@ -8,8 +8,11 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/expr-lang/expr"
+
+	"github.com/google/uuid"
 )
 
 var (
@@ -49,6 +52,12 @@ type HandlerPayload struct {
 	SqlMapper map[string]string
 
 	fromChoose bool
+	uuidMap    sync.Map
+}
+
+// NewUuid generate uuid for variables
+func NewUuid() string {
+	return `_` + strings.ReplaceAll(uuid.NewString(), `-`, ``)
 }
 
 type Handler interface {
@@ -89,15 +98,25 @@ func bindParamsToVar(ctx context.Context, m Handler, attrMap map[string]string, 
 	}
 
 	matches := variable.FindAllString(prepareStmt, -1)
-	var args = make([]interface{}, 0, len(matches))
-
+	args := make([]interface{}, 0, len(matches))
 	typeValue, _ := attrMap[TypeKey]
 
 	for i, match := range matches {
-		matchKey := strings.Trim(match, `#{}`)
+		matchKey := strings.Trim(match, `$#{}`)
 		matchValue, err := expr.Eval(matchKey, input.Input)
 		if err != nil {
 			return &BindVar{err: err}
+		}
+		if matchValue == nil ||
+			reflect.TypeOf(matchValue).Kind() == reflect.String &&
+				strings.Contains(matchValue.(string), `<nil>`) {
+			input.uuidMap.Range(func(key, value any) bool {
+				if strings.Contains(matchKey, key.(string)) {
+					matchKey = strings.ReplaceAll(matchKey, key.(string), value.(string))
+				}
+				return true
+			})
+			return &BindVar{err: fmt.Errorf("gobatis: Args not define: %s variable", matchKey)}
 		}
 		if strings.HasPrefix(match, `#`) {
 			mv := reflect.ValueOf(matchValue)
@@ -105,7 +124,7 @@ func bindParamsToVar(ctx context.Context, m Handler, attrMap map[string]string, 
 				mv = mv.Elem()
 			}
 
-			holders := placeHolder(typeValue, i)
+			var holders string
 			if mv.Kind() == reflect.Slice || mv.Kind() == reflect.Array {
 				var holderArr = make([]string, 0, mv.Len())
 				for i := 0; i < mv.Len(); i++ {
@@ -116,16 +135,12 @@ func bindParamsToVar(ctx context.Context, m Handler, attrMap map[string]string, 
 				holders = strings.Join(holderArr, `, `)
 			} else {
 				args = append(args, matchValue)
+				holders = placeHolder(typeValue, i)
 			}
 
 			prepareStmt = strings.Replace(prepareStmt, match, holders, 1)
 		} else if strings.HasPrefix(match, `$`) {
-			switch reflect.TypeOf(matchValue).Kind() {
-			case reflect.String:
-				prepareStmt = strings.ReplaceAll(prepareStmt, match, fmt.Sprintf(`%q`, matchValue))
-			default:
-				prepareStmt = strings.ReplaceAll(prepareStmt, match, fmt.Sprintf(`%v`, matchValue))
-			}
+			prepareStmt = strings.ReplaceAll(prepareStmt, match, fmt.Sprintf(`%v`, matchValue))
 		}
 	}
 
@@ -259,6 +274,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 			var collection string
 			var item string
 			var separator string
+			var arrayIndexKey string
 
 			if collection, ok = v.AttrsMap[CollectionKey]; !ok {
 				return ``, ErrorForeachNeedCollection
@@ -267,6 +283,8 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 				return ``, ErrorForeachNeedItem
 			}
 			separator, _ = v.AttrsMap[SeparatorKey]
+			arrayIndex, _ := v.AttrsMap[IndexKey]
+			arrayIndex = strings.TrimSpace(arrayIndex)
 
 			value, err := expr.Eval(collection, input.Input)
 			if err != nil {
@@ -295,51 +313,49 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 			case reflect.Slice, reflect.Array:
 				var textArr []string
 				for i := 0; i < val.Len(); i++ {
-					sliceItem, err := expr.Eval(fmt.Sprintf(`%s[%d]`, collection, i), input.Input)
+					collectionKey := fmt.Sprintf(`%s[%d]`, collection, i)
+					sliceItem, err := expr.Eval(collectionKey, input.Input)
 					if err != nil {
 						return ``, err
 					}
-					inputMap.SetMapIndex(
-						reflect.ValueOf(item),
-						reflect.ValueOf(sliceItem),
-					)
+					inputMap.SetMapIndex(reflect.ValueOf(item), reflect.ValueOf(sliceItem))
+					if arrayIndex != `` {
+						arrayIndexKey = NewUuid()
+						inputMap.SetMapIndex(reflect.ValueOf(arrayIndexKey), reflect.ValueOf(i))
+						inputMap.SetMapIndex(reflect.ValueOf(arrayIndex), reflect.ValueOf(i))
+						input.uuidMap.Store(arrayIndexKey, arrayIndex)
+					}
 					var newText string
-					if text, err := intervalEvaluate(ctx, v.Children, &HandlerPayload{
+					if newText, err = intervalEvaluate(ctx, v.Children, &HandlerPayload{
 						Input:      inputMap.Interface(),
 						SqlMapper:  input.SqlMapper,
 						fromChoose: input.fromChoose,
 					}); err != nil {
 						return ``, err
-					} else {
-						newText += text
-					}
-
-					var matchReplacer string
-					switch reflect.TypeOf(sliceItem).Kind() {
-					case reflect.String:
-						matchReplacer = fmt.Sprintf(`%q`, sliceItem)
-					default:
-						matchReplacer = fmt.Sprintf(`%v`, sliceItem)
 					}
 					matches := variable.FindAllString(newText, -1)
 					for _, match := range matches {
-						if strings.HasPrefix(match, `#{`) && strings.HasSuffix(match, `}`) {
-							matchReplacer = fmt.Sprintf(`%s[%d]`, collection, i)
+						if arrayIndex != `` {
+							newText = strings.NewReplacer(match, strings.NewReplacer(
+								arrayIndex,
+								arrayIndexKey,
+							).Replace(match)).Replace(newText)
 						}
-						if strings.HasPrefix(match, `#`) {
-							newText = strings.NewReplacer(
-								match,
-								strings.NewReplacer(item, matchReplacer).Replace(match),
-							).Replace(newText)
-						} else {
-							newText = strings.NewReplacer(
-								match,
-								matchReplacer,
-							).Replace(newText)
-						}
+					}
+					matches = variable.FindAllString(newText, -1)
+					for _, match := range matches {
+						newText = strings.NewReplacer(
+							match,
+							strings.NewReplacer(
+								item,
+								collectionKey,
+							).Replace(match),
+						).Replace(newText)
+						input.uuidMap.Store(collectionKey, item)
 					}
 					textArr = append(textArr, newText)
 				}
+				inputMap.SetMapIndex(reflect.ValueOf(item), reflect.Value{})
 				builder.WriteString(strings.Join(textArr, separator))
 			default:
 				return ``, ErrorForeachStatementIsNotArrayOrMap
@@ -440,7 +456,7 @@ func parseElementEntry(d *xml.Decoder, t interface{}) (any, error) {
 	switch tok := t.(type) {
 	case *xml.StartElement:
 		elementName := XmlName(tok.Name)
-		switch elementName.Name() {
+		switch strings.ToLower(elementName.Name()) {
 		case `if`:
 			stmt = NewIf()
 		case `elif`:
@@ -492,7 +508,7 @@ func (m *Mapper) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		switch el := tok.(type) {
 		case xml.StartElement:
 			elementName := XmlName(el.Name)
-			switch elementName.Name() {
+			switch strings.ToLower(elementName.Name()) {
 			case `select`:
 				var selectSt = NewSelect()
 				if err := d.DecodeElement(selectSt, &el); err != nil {

@@ -33,6 +33,32 @@ The fantastic library for golang, aims to be the most powerful and stable ORM.
     <sql id="userColumns">
         ${alias}.name, ${alias}.department
     </sql>
+
+    <!--复杂的例子-->
+    <select id="findMOrderComplexMore">
+        select count(*) as cnt from
+        <foreach collection="conditions" item="item" separator="," index="index">
+            (select count(*) as cnt from app_events where
+            <foreach collection="item.detail" item="detail" separator="and" index="index1">
+                <trim prefixOverrides="and">
+                  <if test="detail.id != null">
+                  and (id = #{detail.id} and id > #{index})
+                </if>
+                <if test="detail.price != null">
+                  and (price = #{detail.price})
+                </if>
+                <if test="detail.order_id != null or index1 > 0">
+                  and (order_id = #{detail.order_id})
+                </if>
+              </trim>
+            </foreach>
+            ) as ${item.alias+string(index)}
+        </foreach>
+        <where>
+            (a0.cnt > 0 or b1.cnt > 0)
+        </where>
+        ${page}
+    </select>
     
    <!-- 查询用户信息 -->
     <select id="findUser" type="mysql">
@@ -121,10 +147,10 @@ import (
 
 #### 查询数据用 `Find`
 
-- **select * from xxx**
-- **insert into xxx returning xxx**
-- **update xxx set xxx where xxx returning xxx**
-- **delete from xxx where xxx returning xxx**
+- **select * from xxx** 直接查询
+- **insert into xxx returning xxx** 插入后返回插入数据
+- **update xxx set xxx where xxx returning xxx** 更新后返回更新数据
+- **delete from xxx where xxx returning xxx** 删除后返回删除数据
 
 ```go
 var out []any
@@ -155,15 +181,15 @@ if err := db.WithContext(ctx).
 **[ 注意 ]**:
 由于 `xml` 规范的原因，以下字符需要转义：
 
-`&` 需要转移为 `&amp;`
+`&` 需要转义为 `&amp;`
 
-`<` 需要转移为 `&lt;`
+`<` 需要转义为 `&lt;`
 
-`>` 需要转移为 `&gt;`
+`>` 需要转义为 `&gt;`
 
-`'` 需要转移为 `&apos;`
+`'` 需要转义为 `&apos;`
 
-`"` 需要转移为 `&quot;`
+`"` 需要转义为 `&quot;`
 
 或者你可以使用 `CDATA` 标签包裹：
 
@@ -196,7 +222,52 @@ if err := db.WithContext(ctx).
 ```
 
 `sql` 标签用于定义公用部分内容，如数据表的字段信息、公用窗口函数语句等。标签必须定义 `id` 属性，此属性供 `include`标签的 `refid` 属性引用。
-`include`引用之前必须先在 `mapper` 子级定义 `sql` 节点。 不能将 `sql` 节点定义为其他标签的内嵌标签.
+`include`引用之前必须先在 `mapper` 子级定义 `sql` 节点。 
+
+**不能将 `sql` 节点定义为其他标签的内嵌标签(特例：执行单元 `insert`, `select`, `delete`, `update` 标签内部只需要在 `include` 标签前定义即可, 既是是内嵌标签也没有问题).**
+
+正确的示例：
+
+```xml
+<mapper>
+    <sql id="modelColumnsNest">*</sql>  <!-- 正确的位置1 -->
+    <insert id="insertMOrderMultiAndReturning">
+        <sql id="modelColumnsNest">*</sql>  <!-- 正确的位置2 -->
+        insert into m_order (order_id, price, strategy, created_at, updated_at) values
+        <foreach item="item" collection="list" separator=",">
+          <sql id="modelColumnsNest">*</sql>  <!-- 正确的位置3 -->
+            (#{item.OrderId}, #{item.Price}, #{item.Strategy}, #{item.CreatedAt}, #{item.UpdatedAt})
+        </foreach>
+        returning <include refid="modelColumnsNest"/>  <!-- 此处引用 -->
+    </insert>
+    <sql id="modelColumnsNest">*</sql>  <!-- 正确的位置4 -->
+</mapper>
+```
+
+错误的示例：
+
+```xml
+<mapper>
+    <insert id="insertMOrderMultiAndReturning">
+        <sql id="modelColumnsNest">*</sql>  <!-- 错误的位置1 -->
+        insert into m_order (order_id, price, strategy, created_at, updated_at) values
+        <foreach item="item" collection="list" separator=",">
+          <sql id="modelColumnsNest">*</sql>  <!-- 错误的位置2 -->
+            (#{item.OrderId}, #{item.Price}, #{item.Strategy}, #{item.CreatedAt}, #{item.UpdatedAt})
+        </foreach>
+        <sql id="modelColumnsNest">*</sql>  <!-- 错误的位置3 -->
+    </insert>
+
+    <select id="findMOrderById">
+        <!-- 此处引用 -->
+        select <include refid="modelColumnsNest"/> from m_order where id in (#{map(ids, .Id)})
+    </select>
+</mapper>
+```
+
+**[ 注意 ]**:
+
+`mapper` 标签下级的 `sql` 节点, 所有其他地方都可以 `include` 引用, 但是各执行单元(`update`, `insert`, `select`, `delete`) 内的 `sql` 节点, 只能各单元内使用, 只需要遵守 `先定义后使用` 的原则即可.
 
 * include 标签
 
@@ -294,11 +365,10 @@ if err := db.WithContext(ctx).
 
 `where` 标签用于组装 `where` 语句。当子句有 `and` | `or` 开头的时候 `where` 会自动去掉 `and` | `or`, 并且加上 `where` 前缀
 
-
 * foreach 标签
 
 ```xml
-<foreach collection="list" item="item" separator="union">
+<foreach collection="list" item="item" separator="union" index="index">
     select * from employees where id = #{item.id}
 </foreach>
 ```
@@ -308,6 +378,8 @@ if err := db.WithContext(ctx).
 `item`: 表示循环 `collection` 值的时候单个值的变量名
 
 `separator`: 表示 `foreach` 子句的内容之间用什么分隔.
+
+`index`: 表示数组的元素的索引，从 `0` 开始
 
 
 * trim 标签

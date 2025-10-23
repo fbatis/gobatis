@@ -1,0 +1,5 @@
+<mapper type="pg">
+    <select id="findRoadById">
+        select id, name, ST_AsText(start_geom) as start_geom, ST_AsText(end_geom) as end_geom from roads where id = #{id}
+    </select>
+</mapper>

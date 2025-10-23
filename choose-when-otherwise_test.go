@@ -43,11 +43,11 @@ type MOrder struct {
 	OrderId string `json:"order_id"`
 	Name    string `json:"name"`
 
-	Price     float64    `json:"price"`
-	Strategy  *Strategy  `json:"strategy"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	DeletedAt *time.Time `json:"deleted_at"`
+	Price     float64   `json:"price"`
+	Strategy  *Strategy `json:"strategy"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	//DeletedAt *time.Time `json:"deleted_at"`
 }
 
 type Roads struct {
@@ -76,10 +76,44 @@ func TestFindMOrderById(t *testing.T) {
 		Args(&Gobatis{
 			`ids`: []*MOrder{
 				{
-					Id: 20000108,
+					Id: 10006404,
 				},
 				{
-					Id: 20000109,
+					Id: 10006405,
+				},
+			},
+		}).Find(&out).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Log(out)
+}
+
+func TestComplexSQL(t *testing.T) {
+	var out []*MOrder
+	if err := db.WithContext(ctx).
+		Mapper(`findMOrderComplexMore`).
+		Args(&Gobatis{
+			`page`: `limit 5`,
+			`conditions`: []*Gobatis{
+				{
+					`alias`: `a`,
+					`detail`: []*Gobatis{
+						{`id`: 10007527},
+						{`price`: `9254.4`, `order_id`: `m0000006303`},
+						{`order_id`: `m0000006302`},
+					},
+				},
+				{
+					`alias`: `b`,
+					`detail`: []Gobatis{
+						{`id`: 10007526},
+					},
+				},
+				{
+					`alias`: `c`,
+					`detail`: []*Gobatis{
+						{`id`: 10007524},
+					},
 				},
 			},
 		}).Find(&out).Error; err != nil {

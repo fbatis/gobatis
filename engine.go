@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,8 +20,12 @@ var (
 	ErrorInvalidScanRowType    = errors.New(`ScanRow: non-pointer of dest`)
 	ErrorInvalidScanSliceType  = errors.New(`ScanSlice: non-pointer of dest`)
 	ErrorNowRowsFound          = errors.New(`no rows found`)
-	ErrorMapperCallFirst       = errors.New(`database: Mapper() must be invoked, before Bind`)
-	ErrorExecuteFailedWithType = errors.New(`database: Execute: invalid type`)
+	ErrorMapperCallFirst       = errors.New(`gobatis: Mapper() must be invoked, before Bind`)
+	ErrorExecuteFailedWithType = errors.New(`gobatis: Execute: invalid type`)
+
+	timeType     = reflect.TypeOf(time.Time{})
+	timePtrType  = reflect.TypeOf(&time.Time{})
+	nullTimeType = reflect.TypeOf(sql.NullTime{})
 )
 
 // BatisInput Args bind variables
@@ -297,7 +302,13 @@ func (b *DB) WithContext(ctx context.Context) *DB {
 func (b *DB) Transaction(fn func(tx *DB) error) (err error) {
 	var tx *sql.Tx
 
-	tx, err = b.db.BeginTx(b.ctx, &sql.TxOptions{
+	if b.Error != nil {
+		return b.Error
+	}
+
+	db := b.Clone()
+
+	tx, err = db.db.BeginTx(db.ctx, &sql.TxOptions{
 		Isolation: 0,
 		ReadOnly:  false,
 	})
@@ -315,21 +326,23 @@ func (b *DB) Transaction(fn func(tx *DB) error) (err error) {
 			default:
 				err = fmt.Errorf("transaction panic: %v", rerr)
 			}
-			err = tx.Rollback()
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				err = errors.Join(err, rollbackErr)
+			}
 		}
 
 		if err != nil {
-			err = tx.Rollback()
-		} else {
-			if err = tx.Commit(); err == nil {
-				b.tx = nil
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				err = errors.Join(err, rollbackErr)
 			}
+		} else if err = tx.Commit(); err == nil {
+			db.tx = nil
 		}
 	}()
 
-	b.tx = tx
+	db.tx = tx
 
-	return fn(b)
+	return fn(db)
 }
 
 // RawQuery database
@@ -390,7 +403,7 @@ func (b *DB) Find(dest any) *DB {
 
 	var t = b
 	switch b.mapperType {
-	// to support postgres like sql: insert/update/delete xxx from xxx where xxx returing xxx
+	// to support postgres-like sql: insert/update/delete xxx returning xxx
 	case mapperInsert, mapperUpdate, mapperDelete:
 		statements, args, err := b.bindVars.Vars()
 		if err != nil {
@@ -418,13 +431,13 @@ func (b *DB) Find(dest any) *DB {
 	return db
 }
 
-// Mapper generate embed.Fs/path/*.xml to DB
+// Mapper fetch mapper from all xml with the id identifier
 //
 // forexample:
 //
-// select: db.Mapper('id').Args(variables).Find(dest).Error
+// fetch data: db.Mapper('id').Args(variables).Find(dest).Error
 //
-// or: db.Mapper('id').Args(variables).Execute().Error
+// otherwise: db.Mapper('id').Args(variables).Execute().Error
 func (b *DB) Mapper(mapperId string) *DB {
 	if b.Error != nil {
 		return b
@@ -468,6 +481,8 @@ func (b *DB) Args(variables interface{}) *DB {
 // Bind variables to mapper
 // generate stmt prepared handler
 // next call will use the stmt.
+// caller should have known if the variables input was map, he must make sure the input variables
+// [ thread-safe ].
 func (b *DB) Bind(variables interface{}) *DB {
 	if b.Error != nil {
 		return b
@@ -484,6 +499,10 @@ func (b *DB) Bind(variables interface{}) *DB {
 		t = t.Elem()
 	}
 
+	// make sure the input value's type is map
+	// if tag contains foreach, the input' type must be `map`
+	// caller should have known if the variables input was map, he must make sure the input variables
+	// thread-safe.
 	if t.Kind() == reflect.Struct {
 		varBuf, err := json.Marshal(variables)
 		if err != nil {
@@ -494,11 +513,14 @@ func (b *DB) Bind(variables interface{}) *DB {
 		err = json.Unmarshal(varBuf, &variablesMap)
 		if err != nil {
 			db.Error = err
+			return db
 		}
 		variables = variablesMap
 	}
 
-	db.bindVars = db.mapper.Bind(db.ctx, &HandlerPayload{Input: variables, SqlMapper: db.sqlMapper})
+	db.bindVars = db.mapper.Bind(db.ctx, &HandlerPayload{
+		Input: variables, SqlMapper: db.sqlMapper, fromChoose: false, uuidMap: sync.Map{},
+	})
 	statements, args, err := db.bindVars.Vars()
 	if err != nil {
 		db.Error = err
@@ -618,8 +640,8 @@ func (b *DB) scanStruct(typ reflect.Type, columns []string, ctypes []*sql.Column
 			idx = names[strings.ToLower(name)]
 		default:
 			switch ctypes[i].ScanType() {
-			case reflect.TypeOf(time.Time{}):
-				rs.types = append(rs.types, reflect.TypeOf(sql.NullTime{}))
+			case timeType, timePtrType:
+				rs.types = append(rs.types, nullTimeType)
 			default:
 				rs.types = append(rs.types, ctypes[i].ScanType())
 			}
@@ -689,8 +711,8 @@ func (b *DB) scanMap(typ reflect.Type, columns []string, ctypes []*sql.ColumnTyp
 
 	for _, ty := range ctypes {
 		switch ty.ScanType() {
-		case reflect.TypeOf(time.Time{}):
-			rs.types = append(rs.types, reflect.TypeOf(sql.NullTime{}))
+		case timeType, timePtrType:
+			rs.types = append(rs.types, nullTimeType)
 		default:
 			rs.types = append(rs.types, ty.ScanType())
 		}

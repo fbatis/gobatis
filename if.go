@@ -14,6 +14,7 @@ const (
 	SeparatorKey       = `separator`
 	IdKey              = `id`
 	TypeKey            = `type`
+	IndexKey           = `index`
 )
 
 type If struct {

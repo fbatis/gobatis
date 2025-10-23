@@ -1,0 +1,23 @@
+<mapper>
+    <sql id="morderColumns">id, order_id, price, strategy, created_at, updated_at, deleted_at</sql>
+
+    <insert id="insertMOrderMultiAndReturning">
+        insert into m_order (order_id, price, strategy, created_at, updated_at) values
+        <foreach item="item" collection="list" separator=",">
+            (#{item.OrderId}, #{item.Price}, #{item.Strategy}, #{item.CreatedAt}, #{item.UpdatedAt})
+        </foreach>
+        returning id, order_id, price, strategy, created_at, updated_at
+    </insert>
+
+    <insert id="insertMOrderMySQLMulti">
+        insert into m_order (id, name, price, created_at, updated_at) values
+        <foreach item="item" collection="list" separator=",">
+            (#{item.Id}, #{item.Name}, #{item.Price}, #{item.CreatedAt}, #{item.UpdatedAt})
+        </foreach>
+    </insert>
+
+    <select id="findMOrderById">
+        <!--        select * from m_order where id in (#{keys(groupBy(ids, .Id))})-->
+        select <include refid="morderColumns"/> from m_order where id in (#{map(ids, .Id)})
+    </select>
+</mapper>

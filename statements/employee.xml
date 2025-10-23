@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<mapper>
+    <sql id="employeeColumns">employee_id, name, department, performance_score, salary</sql>
+
+    <select id="findEmployeeById">
+        select<include refid="employeeColumns"/>from employees
+        where
+        <if test="id != null">
+            employee_id = #{id}
+        </if>
+        order by employee_id asc limit 1
+    </select>
+
+    <select id="findEmployeeByIfElseId">
+        select<include refid="employeeColumns"/>from employees
+        where
+        <if test="id != null">
+            employee_id <![CDATA[ > ]]> #{id}
+            <trim prefix="and" prefixOverrides="and">
+                <if test="id > 500">and salary <![CDATA[>]]> 5000</if>
+                <if test="id == 501">and salary <![CDATA[>]]> 7000</if>
+            </trim>
+        </if>
+        <else>
+            department = 3
+        </else>
+    </select>
+
+    <select id="findEmployeeByIfElifElseId">
+        select<include refid="employeeColumns"/>from employees
+        where
+        <if test="id != null">
+            employee_id = #{id}
+        </if>
+        <elif test="department != null">
+            department <![CDATA[>]]> #{department}
+        </elif>
+        <else>
+            salary > 5000
+        </else>
+    </select>
+
+    <select id="findEmployeeByChooseWhenId">
+        select<include refid="employeeColumns"/>from employees
+        where
+        <choose>
+            <when test="id != null">
+                employee_id = #{id}
+            </when>
+            <when test="department != null">
+                department <![CDATA[>]]> #{department}
+            </when>
+            <otherwise>
+                salary > 5000
+            </otherwise>
+        </choose>
+    </select>
+</mapper>
