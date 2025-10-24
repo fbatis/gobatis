@@ -34,6 +34,9 @@ type BatisInput = map[string]interface{}
 // Gobatis Args bind variables
 type Gobatis = map[string]interface{}
 
+// Args bind variables
+type Args = map[string]interface{}
+
 const (
 	mapperSelect = iota
 	mapperInsert
@@ -327,13 +330,13 @@ func (b *DB) Transaction(fn func(tx *DB) error) (err error) {
 				err = fmt.Errorf("transaction panic: %v", rerr)
 			}
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				err = errors.Join(err, rollbackErr)
+				err = fmt.Errorf(`rollback error: %#v, raw error: %#v`, rollbackErr, err)
 			}
 		}
 
 		if err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				err = errors.Join(err, rollbackErr)
+				err = fmt.Errorf(`rollback error: %#v, raw error: %#v`, rollbackErr, err)
 			}
 		} else if err = tx.Commit(); err == nil {
 			db.tx = nil

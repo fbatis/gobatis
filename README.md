@@ -5,6 +5,7 @@ The fantastic library for golang, aims to be the most powerful and stable ORM.
 
 ## Overview
 
+* support go1.18+
 * use xml file to define sql
 * support transaction
 * Logger
@@ -379,7 +380,7 @@ if err := db.WithContext(ctx).
 
 `separator`: 表示 `foreach` 子句的内容之间用什么分隔.
 
-`index`: 表示数组的元素的索引，从 `0` 开始
+`index`: 表示数组的元素的索引，从 `0` 开始, 可选属性
 
 
 * trim 标签
