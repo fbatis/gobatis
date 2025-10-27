@@ -2,6 +2,8 @@ package gobatis
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -125,12 +127,17 @@ func bindParamsToVar(ctx context.Context, m Handler, attrMap map[string]string, 
 			}
 
 			var holders string
-			if mv.Kind() == reflect.Slice || mv.Kind() == reflect.Array {
+			_, driverInterface := matchValue.(interface {
+				sql.Scanner
+				driver.Valuer
+			})
+
+			if (mv.Kind() == reflect.Slice || mv.Kind() == reflect.Array) && !driverInterface {
 				var holderArr = make([]string, 0, mv.Len())
-				for i := 0; i < mv.Len(); i++ {
-					holders := placeHolder(typeValue, i)
+				for j := 0; j < mv.Len(); j++ {
+					holders := placeHolder(typeValue, i+j)
 					holderArr = append(holderArr, holders)
-					args = append(args, mv.Index(i).Interface())
+					args = append(args, mv.Index(j).Interface())
 				}
 				holders = strings.Join(holderArr, `, `)
 			} else {

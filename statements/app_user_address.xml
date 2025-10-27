@@ -1,0 +1,9 @@
+<mapper>
+    <select id="findAppUserAddressById">
+        select * from app_user_address where id = #{id}
+    </select>
+
+    <insert id="insertAppUserAddressByValue">
+        insert into app_user_address (id, user_id, address) values (#{id}, #{user_id}, #{address})
+    </insert>
+</mapper>

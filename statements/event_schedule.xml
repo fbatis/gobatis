@@ -1,0 +1,9 @@
+<mapper>
+    <select id="findEventScheduleById">
+        select * from event_schedule where id in (#{id})
+    </select>
+
+    <insert id="insertEventSchedule">
+        insert into event_schedule (id, event_name, schedule) values (#{id}, #{event_name}, #{schedule})
+    </insert>
+</mapper>

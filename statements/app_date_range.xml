@@ -1,0 +1,9 @@
+<mapper>
+    <select id="findAppDateRangeById">
+        select * from app_date_range where id = #{id}
+    </select>
+
+    <insert id="insertAppDateRange">
+        insert into app_date_range (user_id, date_range) values (#{user_id}, #{date_range})
+    </insert>
+</mapper>

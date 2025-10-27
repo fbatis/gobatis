@@ -7,6 +7,7 @@ The fantastic library for golang, aims to be the most powerful and stable ORM.
 
 * support go1.18+
 * use xml file to define sql
+* support complex postgre's type
 * support transaction
 * Logger
 * support insert/update/delete xxxxx returning xxx feature
@@ -146,7 +147,7 @@ import (
     }
 ```
 
-#### 查询数据用 `Find`
+#### 查询数据用 `Find` 方法
 
 - **select * from xxx** 直接查询
 - **insert into xxx returning xxx** 插入后返回插入数据
@@ -163,7 +164,7 @@ if err := db.WithContext(ctx).
 fmt.Printf("%#v\n", out)
 ```
 
-#### 增删改数据但是不返回查询 用 `Execute`
+#### 增删改数据但是不返回查询 用 `Execute` 方法
 
 - **insert into xxx values (xxx)**
 - **update xxx set xxx where xxx**
@@ -175,6 +176,183 @@ if err := db.WithContext(ctx).
 	Args(&Gobatis{`id`:1, `name`:`test`}).Execute().Error; err != nil {
 	panic(err)
 }
+```
+
+
+## 结构体映射
+
+```sql
+create table example (
+    id int primary key auto_increment,
+    name varchar(255),
+    age int
+    address varchar(255)
+);
+```
+
+```go
+type Example struct {
+	Id     int    `json:"id"`
+	Name   string `json:"name"`
+	Age    int    `json:"age"`
+	Address string `json:"address"`
+}
+```
+
+正如上面看到的那样, 我们可以使用 `json` tag来让结构体与数据库字段进行映射, 对应的我们也支持更多 `tag`:
+
+`leopard`, `gorm`, `expr`, `db` `sql` 都是兼容的. 建议大家使用 `json` tag即可, 不用增加复杂度。
+
+
+## Postgres 复杂类型支持
+
+目前 `gobatis` 支持 `Postgres` 的多种复杂类型包括：
+
++ 数组类型 (`int[]`, `text[]`, `bool[]`, `float[]`, `record[]`) 等等
+  + `int[]` 使用 `&gobatis.PgArrayInt{}, 不能使用值类型变量: gobatis.PgArrayInt`
+  + `text[]` 使用 `&gobatis.PgArrayString{}, 不能使用值类型变量: gobatis.PgArrayString`
+  + `bool[]` 使用 `&gobatis.PgArrayBool{}, 不能使用值类型变量: gobatis.PgArrayBool`
+  + `float[]` 使用 `&gobatis.PgArrayFloat{}, 不能使用值类型变量: gobatis.PgArrayFloat`
+  + `record[]` 使用 `&gobatis.PgArrayRecord{}, 不能使用值类型变量: gobatis.PgArrayRecord`
+
++ 自定义类型
+  + 使用 `&gobatis.PgRecord{}` 映射
+
++ 自定义类型数组
+  + 使用 `&gobatis.PgArrayRecord{}` 映射
+
++ 范围类型
+  + `int4range`, `int8range`, `numrange`, `tsrange`, `tstzrange`, `daterange` 使用 `&gobatis.PgRange{}` 映射
+
++ 点类型
+  + 使用 `&gobatis.PgPoint{}` 映射
+
+
+**[ PostGIS ]** 对于 `PostGIS` 中的以下类型的支持后续迭代跟进
+- `POINT` 二维 或者 三维 点类型
+- `LINESTRING` 线类型
+- `POLYGON` 多边形类型
+- `MULTIPOINT` 多点类型
+- `MULTILINESTRING` 多线类型
+- `MULTIPOLYGON`  多多边形类型
+- `GEOMETRYCOLLECTION`  几何集合类型
+- `CIRCULARSTRING`  圆弧字符串类型
+- `COMPOUNDCURVE`  复合曲线类型
+- `CURVEPOLYGON`  曲线多边形类型
+
+示例如下：
+
+```text
+create table example (
+    id serial,
+    name text,
+    cards int[]
+);
+
+// Example
+type Example struct {
+  Id int `json:"id"`
+  Name string `json:"name"`
+  Cards gobatis.PgArrayInt `json:"cards"`
+}
+
+// Query
+var out []*Example
+err := db.WithContext(ctx).Mapper(`xxx`).Args(&gobatis.Args{`id`: 1}).Fomd(&out).Error
+
+// Insert & Update & Delete
+err := db.WithContext(ctx).Mapper(`xxx`).Args(&gobatis.Args{`id`: 1, `name`: `hello`, `cards`: &gobatis.PgArrayInt{1, 2, 3}}).Execute().Error
+```
+
+如果是自定义类型，则需要使用 `gobatis.PgRecord` 或者 `gobatis.PgArrayRecord` 作为结构体的值变量，实现 `sql.Scanner` & `driver.Valuer` 接口即可：
+
+- **gobatis.PgArrayRecord**: 自定义的类型的数组
+- **gobatis.PgRecord**: 自定义类型
+
+```text
+
+create type card as (
+    card_num text,
+    card_name text,
+    card_isn varchar(32)
+);
+
+create table exmaple (
+    id serial,
+    name text,
+    cards card[]
+);
+
+type Card struct {
+    CardNum string `json:"card_num"`
+    CardName string `json:"card_name"`
+    CardIsn string `json:"card_isn"`
+}
+
+type Cards struct {
+    value gobatis.PgArrayRecord
+    Details []*Card
+}
+
+func (c *Cards) Scan(value interface{}) error {
+    err := c.value.Scan(value)
+    if err != nil {
+        return err
+    }
+    for _, cardItem := range c.value {
+        if len(cardItem) != 3 {
+            return errors.New("card detail is invalid")
+        }
+        c.Details = append(c.Details, &Card{
+            CardNum: cardItem[0],
+            CardName: cardItem[1],
+            CardIsn: cardItem[2],
+        })
+    }
+    return nil
+}
+
+func (c *Cards) Value() (driver.Value, error) {
+	c.value = nil
+	for _, card := range c.Details {
+		c.value = append(c.value, []string{card.CardNum, card.CardName, card.CardIsn})
+	}
+	return c.value.Value()
+}
+
+type Example struct {
+  Id int `json:"id"`
+  Name string `json:"name"`
+  Cards Cards  `json:"cards"`
+}
+
+// Query
+var out []Example
+if err = db.WithContext(ctx).Mapper(`findCardById`).Args(&gobatis.Args{`id`: 2}).Find(&out).Error; err != nil {
+    panic(err)
+}
+t.Log(out)
+
+// Insert & Update & delete
+err = db.WithContext(ctx).Mapper(`insertCard`).
+		Args(&gobatis.Args{
+			`name`: `card example 2`,
+			`cards`: &Cards{
+				Details: []*Card{
+					{
+						CardNum:  `CardNum1`,
+						CardName: `CardName1`,
+						CardIsn:  `CardIsn1`,
+					},
+					{
+						CardNum:  `CardNum2`,
+						CardName: `CardName2`,
+						CardIsn:  `CardIsn2`,
+					},
+				},
+			},
+		}).Execute().Error
+
 ```
 
 ### XML Grammer

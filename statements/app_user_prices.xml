@@ -1,0 +1,9 @@
+<mapper>
+    <select id="findAppUserPricesById">
+        select * from app_user_prices where id = #{id}
+    </select>
+
+    <insert id="insertAppUserPrices">
+        insert into app_user_prices (id, user_id, prices) values (#{id}, #{user_id}, #{price})
+    </insert>
+</mapper>

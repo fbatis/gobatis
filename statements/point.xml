@@ -1,0 +1,9 @@
+<mapper>
+    <select id="findPointById">
+        select * from point where id = #{id}
+    </select>
+
+    <insert id="insertPoint">
+        insert into point (name, point) values (#{name}, #{point})
+    </insert>
+</mapper>

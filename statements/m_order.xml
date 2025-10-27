@@ -4,10 +4,13 @@
     <insert id="insertMOrderMultiAndReturning">
         insert into m_order (order_id, price, strategy, created_at, updated_at) values
         <foreach item="item" collection="list" separator=",">
+            <sql id="modelColumnsNest">*</sql>
             (#{item.OrderId}, #{item.Price}, #{item.Strategy}, #{item.CreatedAt}, #{item.UpdatedAt})
         </foreach>
-        returning id, order_id, price, strategy, created_at, updated_at
+        returning <include refid="morderColumnsForMySql"/>
     </insert>
+
+    <sql id="morderColumnsForMySql">*</sql>
 
     <insert id="insertMOrderMySQLMulti">
         insert into m_order (id, name, price, created_at, updated_at) values
@@ -16,8 +19,83 @@
         </foreach>
     </insert>
 
+    <sql id="atable">select * from a</sql>
+    <sql id="btable">select * from b</sql>
+    <sql id="ctable">select * from c</sql>
+    <sql id="dtable">select * from d</sql>
+
+    <select id="forward">
+        select count(*) as cnt from
+        (<include  refid="atable"/>) as a,
+        (<include  refid="btable"/>) as b,
+        (<include  refid="ctable"/>) as c,
+        (<include  refid="dtable"/>) as d
+        where (
+          a.cnt > 0
+          and b.cnt > 0
+        ) or (
+          c.cnt > 0
+          and d.cnt > 0
+        )
+    </select>
+
+    <select id="findMOrderComplexMore">
+        select count(*) as cnt
+        from
+        <foreach collection="conditions" item="item" separator=",">
+            (select count(*) as cnt from app_events where
+            <foreach collection="item.detail" item="detail" separator="and" index="index1">
+                <trim prefixOverrides="and">
+                    <if test="detail.id != null">
+                        and (id = #{detail.id} or id > 1)
+                    </if>
+                    <if test="detail.price != null">
+                        and (price = #{detail.price})
+                    </if>
+                    <if test="detail.order_id != null or index1 > 0">
+                        and (order_id = #{detail.order_id})
+                    </if>
+                </trim>
+            </foreach>
+            ) as ${item.alias}
+        </foreach>
+        <where>
+            (a.cnt > 0 or b.cnt > 0)
+        </where>
+        <if test="page != null">
+            ${page}
+        </if>
+    </select>
+
+    <select id="findMOrderForComplex">
+        select * from m_order
+        <where>
+            (
+            <foreach collection="conditions" item="item" separator="or">
+                (
+                <foreach collection="item.detail" item="detail" separator="and">
+                    <trim prefixOverrides="and">
+                        <if test="detail.id != null">
+                            and id = #{detail.id}
+                        </if>
+                        <if test="detail.price != null">
+                            and price = #{detail.price}
+                        </if>
+                        <if test="detail.order_id != null">
+                            and order_id = #{detail.order_id}
+                        </if>
+                    </trim>
+                </foreach>
+                )
+            </foreach>
+            )
+        </where>
+        ${page}
+    </select>
+
     <select id="findMOrderById">
-        <!--        select * from m_order where id in (#{keys(groupBy(ids, .Id))})-->
-        select <include refid="morderColumns"/> from m_order where id in (#{map(ids, .Id)})
+        select <include refid="morderColumns"/> from m_order
+        where
+        id in (#{map(ids, .Id)})
     </select>
 </mapper>

@@ -22,10 +22,26 @@ var (
 	ErrorNowRowsFound          = errors.New(`no rows found`)
 	ErrorMapperCallFirst       = errors.New(`gobatis: Mapper() must be invoked, before Bind`)
 	ErrorExecuteFailedWithType = errors.New(`gobatis: Execute: invalid type`)
+	ErrorDestCantBeNil         = errors.New("gobatis: Dest can't be nil")
 
-	timeType     = reflect.TypeOf(time.Time{})
-	timePtrType  = reflect.TypeOf(&time.Time{})
-	nullTimeType = reflect.TypeOf(sql.NullTime{})
+	timeType    = reflect.TypeOf(time.Time{})
+	timePtrType = reflect.TypeOf(&time.Time{})
+	stringType  = reflect.TypeOf("")
+	boolType    = reflect.TypeOf(false)
+	int64Type   = reflect.TypeOf(int64(0))
+	byteType    = reflect.TypeOf(byte(0))
+	float64Type = reflect.TypeOf(float64(0))
+	int16Type   = reflect.TypeOf(int16(0))
+	int32Type   = reflect.TypeOf(int32(0))
+
+	nullTimeType    = reflect.TypeOf(sql.NullTime{})
+	nullStringType  = reflect.TypeOf(sql.NullString{})
+	nullBoolType    = reflect.TypeOf(sql.NullBool{})
+	nullInt64Type   = reflect.TypeOf(sql.NullInt64{})
+	nullByteType    = reflect.TypeOf(sql.NullByte{})
+	nullFloat64Type = reflect.TypeOf(sql.NullFloat64{})
+	nullInt16Type   = reflect.TypeOf(sql.NullInt16{})
+	nullInt32Type   = reflect.TypeOf(sql.NullInt32{})
 )
 
 // BatisInput Args bind variables
@@ -538,7 +554,7 @@ func (b *DB) Bind(variables interface{}) *DB {
 	}
 }
 
-// Execute execute database's insert, update and delete
+// Execute database's insert, update and delete
 // if database running statements with returning, use method Find instead.
 func (b *DB) Execute() *DB {
 	if b.Error != nil {
@@ -567,7 +583,7 @@ func (b *DB) Execute() *DB {
 }
 
 func (b *DB) columnName(f reflect.StructField) string {
-	tags := []string{`expr`, `leopard`, `db`, `gorm`, `sql`, `json`}
+	tags := []string{`json`, `expr`, `leopard`, `db`, `gorm`, `sql`}
 	for _, tag := range tags {
 		if n, ok := f.Tag.Lookup(tag); ok {
 			for _, piece := range strings.Split(n, `;`) {
@@ -645,6 +661,20 @@ func (b *DB) scanStruct(typ reflect.Type, columns []string, ctypes []*sql.Column
 			switch ctypes[i].ScanType() {
 			case timeType, timePtrType:
 				rs.types = append(rs.types, nullTimeType)
+			case stringType:
+				rs.types = append(rs.types, nullStringType)
+			case boolType:
+				rs.types = append(rs.types, nullBoolType)
+			case int64Type:
+				rs.types = append(rs.types, nullInt64Type)
+			case byteType:
+				rs.types = append(rs.types, nullByteType)
+			case float64Type:
+				rs.types = append(rs.types, nullFloat64Type)
+			case int16Type:
+				rs.types = append(rs.types, nullInt16Type)
+			case int32Type:
+				rs.types = append(rs.types, nullInt32Type)
 			default:
 				rs.types = append(rs.types, ctypes[i].ScanType())
 			}
@@ -716,6 +746,20 @@ func (b *DB) scanMap(typ reflect.Type, columns []string, ctypes []*sql.ColumnTyp
 		switch ty.ScanType() {
 		case timeType, timePtrType:
 			rs.types = append(rs.types, nullTimeType)
+		case stringType:
+			rs.types = append(rs.types, nullStringType)
+		case boolType:
+			rs.types = append(rs.types, nullBoolType)
+		case int64Type:
+			rs.types = append(rs.types, nullInt64Type)
+		case byteType:
+			rs.types = append(rs.types, nullByteType)
+		case float64Type:
+			rs.types = append(rs.types, nullFloat64Type)
+		case int16Type:
+			rs.types = append(rs.types, nullInt16Type)
+		case int32Type:
+			rs.types = append(rs.types, nullInt32Type)
 		default:
 			rs.types = append(rs.types, ty.ScanType())
 		}
@@ -756,6 +800,10 @@ func (b *DB) scanType(typ reflect.Type, columns []string, ctypes []*sql.ColumnTy
 }
 
 func (b *DB) scanSlice(rows *sql.Rows, dest any) error {
+	if dest == nil {
+		return ErrorDestCantBeNil
+	}
+
 	v := reflect.ValueOf(dest)
 	if v.Kind() != reflect.Pointer {
 		return ErrorInvalidScanSliceType
@@ -800,6 +848,10 @@ func (b *DB) scanSlice(rows *sql.Rows, dest any) error {
 }
 
 func (b *DB) scan(rows *sql.Rows, dest any) error {
+	if dest == nil {
+		return ErrorDestCantBeNil
+	}
+
 	t := reflect.TypeOf(dest)
 	if t.Kind() != reflect.Pointer {
 		return ErrorInvalidScanRowType

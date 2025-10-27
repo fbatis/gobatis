@@ -1,0 +1,9 @@
+<mapper>
+    <select id="findAppIntRangeById">
+        select * from app_int_range where id = #{id}
+    </select>
+
+    <insert id="insertAppIntRange">
+        insert into app_int_range (user_id, int_range) values (#{user_id}, #{int_range})
+    </insert>
+</mapper>

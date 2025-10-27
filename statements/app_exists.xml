@@ -1,0 +1,9 @@
+<mapper>
+    <select id="findAppExistsById">
+        select * from app_exists where id = #{id}
+    </select>
+
+    <insert id="insertAppExists">
+        insert into app_exists (user_id, exists) values (#{user_id}, #{exists})
+    </insert>
+</mapper>

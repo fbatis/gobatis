@@ -1,0 +1,9 @@
+<mapper>
+    <select id="findCardById">
+        select * from card_example where id = #{id}
+    </select>
+
+    <insert id="insertCard">
+        insert into card_example (name, cards) values (#{name}, #{cards})
+    </insert>
+</mapper>

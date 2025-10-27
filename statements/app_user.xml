@@ -1,0 +1,9 @@
+<mapper>
+    <select id="findAppUserById">
+        select * from app_user where id = #{id}
+    </select>
+
+    <insert id="insertAppUser">
+        insert into app_user (id, name, email, pets) values (#{id}, #{name}, #{email}, #{pets})
+    </insert>
+</mapper>
