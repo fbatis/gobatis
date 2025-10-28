@@ -1,6 +1,9 @@
 package gobatis
 
-import "encoding/xml"
+import (
+	"encoding/xml"
+	"strings"
+)
 
 type Foreach struct {
 	Children []interface{}
@@ -21,7 +24,7 @@ func (m *Foreach) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 
 	m.Attrs = start.Attr
 	for _, attr := range start.Attr {
-		m.AttrsMap[XmlName(attr.Name).Name()] = attr.Value
+		m.AttrsMap[XmlName(attr.Name).Name()] = strings.TrimSpace(attr.Value)
 	}
 
 	for {

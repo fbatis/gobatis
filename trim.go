@@ -1,6 +1,9 @@
 package gobatis
 
-import "encoding/xml"
+import (
+	"encoding/xml"
+	"strings"
+)
 
 type Trim struct {
 	Children []interface{}
@@ -20,7 +23,7 @@ func NewTrim() *Trim {
 func (m *Trim) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	m.Attrs = start.Attr
 	for _, attr := range m.Attrs {
-		m.AttrsMap[XmlName(attr.Name).Name()] = attr.Value
+		m.AttrsMap[XmlName(attr.Name).Name()] = strings.TrimSpace(attr.Value)
 	}
 
 	for {

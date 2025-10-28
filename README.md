@@ -260,7 +260,7 @@ type Example struct {
 
 // Query
 var out []*Example
-err := db.WithContext(ctx).Mapper(`xxx`).Args(&gobatis.Args{`id`: 1}).Find(&out).Error
+err := db.WithContext(ctx).Mapper(`xxx`).Args(&gobatis.Args{`id`: 1}).Fomd(&out).Error
 
 // Insert & Update & Delete
 err := db.WithContext(ctx).Mapper(`xxx`).Args(&gobatis.Args{`id`: 1, `name`: `hello`, `cards`: &gobatis.PgArrayInt{1, 2, 3}}).Execute().Error
@@ -357,9 +357,7 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
 
 ```
 
-### 动态SQL
-
-gobatis的动态SQL使用xml组装的，具体如下
+### XML Grammer
 
 **[ 注意 ]**:
 由于 `xml` 规范的原因，以下字符需要转义：
@@ -708,4 +706,3 @@ gobatis的动态SQL使用xml组装的，具体如下
   - bitushr(int, int)
 
 * 具体的明细内容参考 expr-lang/expr [Language Definition](https://expr-lang.org/docs/language-definition#float)
-

@@ -3,6 +3,7 @@ package gobatis
 import (
 	"context"
 	"encoding/xml"
+	"strings"
 )
 
 // Delete children can be one of: CharData, If, Elif, Else, Choose, Where, Foreach, Trim, Otherwise, Include, Sql,
@@ -34,7 +35,7 @@ func (m *Delete) Bind(ctx context.Context, input *HandlerPayload) *BindVar {
 func (m *Delete) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	m.Attrs = start.Attr
 	for _, attr := range start.Attr {
-		m.AttrsMap[XmlName(attr.Name).Name()] = attr.Value
+		m.AttrsMap[XmlName(attr.Name).Name()] = strings.TrimSpace(attr.Value)
 	}
 
 	for {

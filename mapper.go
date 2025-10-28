@@ -201,7 +201,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 		switch v := child.(type) {
 		case *If:
 			ifExist = true
-			if testNode, exist := v.AttrsMap[TestKey]; exist {
+			if testNode, exist := v.AttrsMap[TestKey]; exist && strings.TrimSpace(testNode) != `` {
 				if ok, err = exprEvaluate(testNode, input.Input); err != nil {
 					return ``, err
 				} else if ok {
@@ -220,7 +220,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 			if ok {
 				continue
 			}
-			if testNode, exist := v.AttrsMap[TestKey]; exist {
+			if testNode, exist := v.AttrsMap[TestKey]; exist && strings.TrimSpace(testNode) != `` {
 				if ok, err = exprEvaluate(testNode, input.Input); err != nil {
 					return ``, err
 				} else if ok {
@@ -257,7 +257,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 				continue
 			}
 			whenExist = true
-			if testNode, exist := v.AttrsMap[TestKey]; exist {
+			if testNode, exist := v.AttrsMap[TestKey]; exist && strings.TrimSpace(testNode) != `` {
 				if ok, err = exprEvaluate(testNode, input.Input); err != nil {
 					return ``, err
 				} else if ok {
