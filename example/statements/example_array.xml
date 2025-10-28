@@ -1,0 +1,12 @@
+<mapper>
+    <select id="findExampleArrayById">
+        select * from example_array
+        where
+        id = #{id}
+    </select>
+
+    <insert id="insertExampleArrayWithNull">
+        insert into example_array (array_of_integers, array_of_text, array_of_char) values
+        (#{array_of_integers}, #{array_of_text}, #{array_of_char})
+    </insert>
+</mapper>

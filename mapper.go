@@ -84,6 +84,10 @@ func placeHolder(typ string, count int) string {
 	switch strings.ToLower(typ) {
 	case `postgres`, `pg`, `pgx`, `pgx/v5`: // postgres use $1, $2, ... as placeholders for prepare statements.
 		return fmt.Sprintf(`$%d`, count+1)
+	case `sqlserver`, `mssql`:
+		return fmt.Sprintf(`@p%d`, count+1) // for sqlserver, use @p1, @p2, ... as placeholders for prepare statements.
+	case `godror`, `goracle`:
+		return fmt.Sprintf(`:%d`, count+1) // for oracle, use :1, :2, ... as placeholders for prepare statements.
 	default: // mysql or sqlite use ? as placeholders for prepare statements.
 		return `?`
 	}
@@ -109,9 +113,8 @@ func bindParamsToVar(ctx context.Context, m Handler, attrMap map[string]string, 
 		if err != nil {
 			return &BindVar{err: err}
 		}
-		if matchValue == nil ||
-			reflect.TypeOf(matchValue).Kind() == reflect.String &&
-				strings.Contains(matchValue.(string), `<nil>`) {
+		if matchValue != nil && reflect.TypeOf(matchValue).Kind() == reflect.String &&
+			strings.Contains(matchValue.(string), `<nil>`) {
 			input.uuidMap.Range(func(key, value any) bool {
 				if strings.Contains(matchKey, key.(string)) {
 					matchKey = strings.ReplaceAll(matchKey, key.(string), value.(string))

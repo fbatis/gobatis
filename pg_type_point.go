@@ -23,6 +23,8 @@ func (pg *PgPoint) Scan(value any) error {
 		scan = bufio.NewScanner(bytes.NewReader(v))
 	case string:
 		scan = bufio.NewScanner(strings.NewReader(v))
+	case nil:
+		return nil
 	default:
 		return errors.New(`gobatis: not supported type`)
 	}

@@ -22,6 +22,8 @@ func (pg *PgArrayInt) Scan(value any) error {
 		scan = bufio.NewScanner(bytes.NewReader(v))
 	case string:
 		scan = bufio.NewScanner(strings.NewReader(v))
+	case nil:
+		return nil
 	default:
 		return errors.New(`gobatis: not supported type`)
 	}
@@ -84,6 +86,8 @@ func (pg *PgArrayFloat) Scan(value any) error {
 		scan = bufio.NewScanner(bytes.NewReader(v))
 	case string:
 		scan = bufio.NewScanner(strings.NewReader(v))
+	case nil:
+		return nil
 	default:
 		return errors.New(`gobatis: not supported type`)
 	}
@@ -146,6 +150,8 @@ func (pg *PgArrayString) Scan(value any) error {
 		scan = bufio.NewScanner(bytes.NewReader(v))
 	case string:
 		scan = bufio.NewScanner(strings.NewReader(v))
+	case nil:
+		return nil
 	default:
 		return errors.New(`gobatis: not supported type`)
 	}
@@ -226,6 +232,8 @@ func (pg *PgArrayBool) Scan(value any) error {
 		scan = bufio.NewScanner(bytes.NewReader(v))
 	case string:
 		scan = bufio.NewScanner(strings.NewReader(v))
+	case nil:
+		return nil
 	default:
 		return errors.New(`gobatis: not supported type`)
 	}
@@ -295,6 +303,8 @@ func (pg *PgArrayRecord) Scan(value any) error {
 		scan = bufio.NewScanner(bytes.NewReader(v))
 	case string:
 		scan = bufio.NewScanner(strings.NewReader(v))
+	case nil:
+		return nil
 	default:
 		return errors.New(`gobatis: not supported type`)
 	}

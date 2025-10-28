@@ -209,11 +209,13 @@ type Example struct {
 目前 `gobatis` 支持 `Postgres` 的多种复杂类型包括：
 
 + 数组类型 (`int[]`, `text[]`, `bool[]`, `float[]`, `record[]`) 等等
-  + `int[]` 使用 `&gobatis.PgArrayInt{}, 不能使用值类型变量: gobatis.PgArrayInt`
-  + `text[]` 使用 `&gobatis.PgArrayString{}, 不能使用值类型变量: gobatis.PgArrayString`
-  + `bool[]` 使用 `&gobatis.PgArrayBool{}, 不能使用值类型变量: gobatis.PgArrayBool`
-  + `float[]` 使用 `&gobatis.PgArrayFloat{}, 不能使用值类型变量: gobatis.PgArrayFloat`
-  + `record[]` 使用 `&gobatis.PgArrayRecord{}, 不能使用值类型变量: gobatis.PgArrayRecord`
+  + `int[]` 使用 `&gobatis.PgArrayInt{}` 映射
+  + `text[]`, `varchar[]`, `char[]` 使用 `&gobatis.PgArrayString{}` 映射
+  + `bool[]` 使用 `&gobatis.PgArrayBool{}` 映射
+  + `float[]`, `float4[]`, `float8[]` 使用 `&gobatis.PgArrayFloat{}` 映射
+  + `record[]` 使用 `&gobatis.PgArrayRecord{}` 映射
+  + 其他的数组类型 都可以使用 `&gobatis.PgArrayString{}` 映射
+  + 无法解析的类型，可以提交 `issue` 进行解决
 
 + 自定义类型
   + 使用 `&gobatis.PgRecord{}` 映射
@@ -228,7 +230,7 @@ type Example struct {
   + 使用 `&gobatis.PgPoint{}` 映射
 
 
-**[ PostGIS ]** 对于 `PostGIS` 中的以下类型的支持后续迭代跟进
+**[ PostGIS ]** 对于 `PostGIS` 中的以下类型的支持后续视情况迭代跟进
 - `POINT` 二维 或者 三维 点类型
 - `LINESTRING` 线类型
 - `POLYGON` 多边形类型
