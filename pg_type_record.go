@@ -35,6 +35,11 @@ import (
 //	}
 type PgRecord []string
 
+var (
+	RecordReplacer        = strings.NewReplacer(`""`, `"`, `",`, ``, `")`, ``)
+	RecordReverseReplacer = strings.NewReplacer(`"`, `""`)
+)
+
 // Scan sql/database Scan interface
 func (pg *PgRecord) Scan(value any) error {
 	var scan *bufio.Scanner
@@ -67,11 +72,11 @@ func (pg *PgRecord) Scan(value any) error {
 					text = scan.Text()
 					builder.WriteString(text)
 					if strings.HasSuffix(builder.String(), `",`) {
-						*pg = append(*pg, strings.NewReplacer(`""`, `"`, `",`, ``).Replace(builder.String()))
+						*pg = append(*pg, RecordReplacer.Replace(builder.String()))
 						break
 					}
 					if strings.HasSuffix(builder.String(), `")`) {
-						*pg = append(*pg, strings.NewReplacer(`""`, `"`, `")`, ``).Replace(builder.String()))
+						*pg = append(*pg, RecordReplacer.Replace(builder.String()))
 						break
 					}
 				}
@@ -100,7 +105,8 @@ func (pg *PgRecord) Value() (driver.Value, error) {
 	b.Grow(len(*pg) * 3)
 	b.WriteString(`(`)
 	for i, v := range *pg {
-		if strings.Contains(v, `,`) {
+		v = RecordReverseReplacer.Replace(v)
+		if bytes.IndexAny([]byte(v), `, "`) != -1 {
 			v = `"` + v + `"`
 		}
 		b.WriteString(v)

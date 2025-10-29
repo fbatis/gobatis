@@ -142,6 +142,11 @@ func (pg *PgArrayFloat) Value() (driver.Value, error) {
 // which Names was PgArrayString type
 type PgArrayString []string
 
+var (
+	ArrayStringReplacer        = strings.NewReplacer(`\"`, `"`)
+	ArrayStringReverseReplacer = strings.NewReplacer(`"`, `\"`)
+)
+
 // Scan sql/database Scan interface
 func (pg *PgArrayString) Scan(value any) error {
 	var scan *bufio.Scanner
@@ -181,7 +186,7 @@ func (pg *PgArrayString) Scan(value any) error {
 						builder.WriteString(innerText)
 						continue
 					}
-					*pg = append(*pg, strings.NewReplacer(`\"`, `"`).Replace(builder.String()))
+					*pg = append(*pg, ArrayStringReplacer.Replace(builder.String()))
 					break
 				}
 				continue
@@ -211,7 +216,8 @@ func (pg *PgArrayString) Value() (driver.Value, error) {
 	b.Grow(len(*pg) * 3)
 	b.WriteString(`{`)
 	for i, v := range *pg {
-		if strings.Contains(v, `,`) {
+		v = ArrayStringReverseReplacer.Replace(v)
+		if bytes.IndexAny([]byte(v), `, "`) != -1 {
 			v = `"` + v + `"`
 		}
 		b.WriteString(v)
@@ -299,6 +305,11 @@ func (pg *PgArrayBool) Value() (driver.Value, error) {
 // PgArrayRecord postgresql array record
 type PgArrayRecord [][]string
 
+var (
+	ArrayRecordReplacer        = strings.NewReplacer(`\"\"`, `"`, `\",`, ``, `\")`, ``, `\\\\`, `\`)
+	ArrayRecordReverseReplacer = strings.NewReplacer(`"`, `\"\"`, `\`, `\\\\`)
+)
+
 // Scan sql/database Scan interface
 func (pg *PgArrayRecord) Scan(value any) error {
 	var scan *bufio.Scanner
@@ -355,7 +366,6 @@ func (pg *PgArrayRecord) Scan(value any) error {
 							detail.WriteString(text)
 
 							if strings.HasSuffix(detail.String(), `\",`) {
-
 								goto addItem
 							} else if strings.HasSuffix(detail.String(), `\")`) {
 								goto addItem
@@ -366,14 +376,13 @@ func (pg *PgArrayRecord) Scan(value any) error {
 				}
 			addItem:
 				if text == `,` {
-					recordItem = append(recordItem,
-						strings.NewReplacer(`\"\"`, `"`, `\",`, ``, `\")`, ``).Replace(detail.String()))
+					recordItem = append(recordItem, ArrayRecordReplacer.Replace(detail.String()))
 					detail.Reset()
 					continue
 				}
 				if text == `)` {
-					recordItem = append(recordItem,
-						strings.NewReplacer(`\"\"`, `"`, `\",`, ``, `\")`, ``).Replace(detail.String()))
+					recordItem = append(recordItem, ArrayRecordReplacer.Replace(detail.String()))
+					detail.Reset()
 					break
 				}
 
@@ -413,7 +422,8 @@ func (pg *PgArrayRecord) Value() (driver.Value, error) {
 	for i, v := range *pg {
 		b.WriteString(`"(`)
 		for j, item := range v {
-			if strings.Contains(item, `,`) {
+			item = ArrayRecordReverseReplacer.Replace(item)
+			if bytes.IndexAny([]byte(item), `, "`) != -1 {
 				item = `\"` + item + `\"`
 			}
 			b.WriteString(item)
