@@ -64,13 +64,16 @@ func (pg *PgRecord) Scan(value any) error {
 			if text == `"` {
 				builder.Reset()
 				for scan.Scan() {
-					innserText := scan.Text()
-					if innserText != `"` {
-						builder.WriteString(innserText)
-						continue
+					text = scan.Text()
+					builder.WriteString(text)
+					if strings.HasSuffix(builder.String(), `",`) {
+						*pg = append(*pg, strings.NewReplacer(`""`, `"`, `",`, ``).Replace(builder.String()))
+						break
 					}
-					*pg = append(*pg, builder.String())
-					break
+					if strings.HasSuffix(builder.String(), `")`) {
+						*pg = append(*pg, strings.NewReplacer(`""`, `"`, `")`, ``).Replace(builder.String()))
+						break
+					}
 				}
 				continue
 			}

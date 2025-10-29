@@ -177,7 +177,11 @@ func (pg *PgArrayString) Scan(value any) error {
 						builder.WriteString(innerText)
 						continue
 					}
-					*pg = append(*pg, builder.String())
+					if strings.HasSuffix(builder.String(), `\`) {
+						builder.WriteString(innerText)
+						continue
+					}
+					*pg = append(*pg, strings.NewReplacer(`\"`, `"`).Replace(builder.String()))
 					break
 				}
 				continue
@@ -334,7 +338,6 @@ func (pg *PgArrayRecord) Scan(value any) error {
 				goto errorRecordArrayType
 			}
 
-		nextItem:
 			for scan.Scan() {
 				text = scan.Text()
 
@@ -342,24 +345,39 @@ func (pg *PgArrayRecord) Scan(value any) error {
 					detail.Reset()
 					for scan.Scan() {
 						text = scan.Text()
-						if text == `"` {
-							if !strings.HasSuffix(detail.String(), `\`) {
-								continue
-							}
-							recordItem = append(recordItem, detail.String()[:len(detail.String())-1])
-							goto nextItem
+						if text != `"` {
+							continue
 						}
-						detail.WriteString(text)
+
+						// text body
+						for scan.Scan() {
+							text = scan.Text()
+							detail.WriteString(text)
+
+							if strings.HasSuffix(detail.String(), `\",`) {
+
+								goto addItem
+							} else if strings.HasSuffix(detail.String(), `\")`) {
+								goto addItem
+							}
+						}
+						goto errorRecordArrayType
 					}
 				}
-
+			addItem:
 				if text == `,` {
+					recordItem = append(recordItem,
+						strings.NewReplacer(`\"\"`, `"`, `\",`, ``, `\")`, ``).Replace(detail.String()))
+					detail.Reset()
 					continue
 				}
 				if text == `)` {
+					recordItem = append(recordItem,
+						strings.NewReplacer(`\"\"`, `"`, `\",`, ``, `\")`, ``).Replace(detail.String()))
 					break
 				}
-				recordItem = append(recordItem, text)
+
+				detail.WriteString(text)
 			}
 
 			for scan.Scan() {
