@@ -22,6 +22,24 @@ var (
 
 	// SplitPgPointType split string used by bufio.Scanner Split func
 	SplitPgPointType = SplitByString(`(,)`)
+
+	// SplitPgArrayLineType split string used by bufio.Scanner Split func
+	SplitPgArrayLineType = SplitByString(`{",}`)
+
+	// SplitPgArrayLsegType split string used by bufio.Scanner Split func
+	SplitPgArrayLsegType = SplitByString(`{[(,)]}`)
+
+	// SplitPgArrayBoxType split string used by bufio.Scanner Split func
+	SplitPgArrayBoxType = SplitByString(`{(),;}`)
+
+	// SplitPgArrayPathType split string used by bufio.Scanner Split func
+	SplitPgArrayPathType = SplitByString(`{"(),}`)
+
+	// SplitPgCircleType split string used by bufio.Scanner Split func
+	SplitPgCircleType = SplitByString(`<(,)>`)
+
+	// SplitPgArrayCircleType split string used by bufio.Scanner Split func
+	SplitPgArrayCircleType = SplitByString(`{"<(,)>}`)
 )
 
 // SplitByString split string used by bufio.Scanner Split func

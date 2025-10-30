@@ -1,8 +1,6 @@
 package gobatis
 
 import (
-	"bufio"
-	"bytes"
 	"database/sql/driver"
 	"errors"
 	"strings"
@@ -28,16 +26,9 @@ type PgRange struct {
 
 // Scan sql/database Scan interface
 func (pg *PgRange) Scan(value any) error {
-	var scan *bufio.Scanner
-	switch v := value.(type) {
-	case []byte:
-		scan = bufio.NewScanner(bytes.NewReader(v))
-	case string:
-		scan = bufio.NewScanner(strings.NewReader(v))
-	case nil:
-		return nil
-	default:
-		return errors.New(`gobatis: not supported type`)
+	scan, err := fetchScanner(value)
+	if scan == nil || err != nil {
+		return err
 	}
 
 	pg.ContainFrom = false
@@ -94,7 +85,7 @@ func (pg *PgRange) Scan(value any) error {
 		}
 	}
 errorRangeType:
-	return errors.New(`gobatis: value not array type`)
+	return errors.New(`gobatis: value not the form of range`)
 }
 
 // Value sql/database Value interface

@@ -1,7 +1,6 @@
 package gobatis
 
 import (
-	"bufio"
 	"bytes"
 	"database/sql/driver"
 	"errors"
@@ -16,16 +15,9 @@ type PgArrayInt []int64
 
 // Scan sql/database Scan interface
 func (pg *PgArrayInt) Scan(value any) error {
-	var scan *bufio.Scanner
-	switch v := value.(type) {
-	case []byte:
-		scan = bufio.NewScanner(bytes.NewReader(v))
-	case string:
-		scan = bufio.NewScanner(strings.NewReader(v))
-	case nil:
-		return nil
-	default:
-		return errors.New(`gobatis: not supported type`)
+	scan, err := fetchScanner(value)
+	if scan == nil || err != nil {
+		return err
 	}
 
 	scan.Split(SplitPgArrayType)
@@ -55,7 +47,7 @@ func (pg *PgArrayInt) Scan(value any) error {
 			return nil
 		}
 	}
-	return errors.New(`gobatis: value not array type`)
+	return errors.New(`gobatis: value not int[]`)
 }
 
 // Value sql/database Value interface
@@ -80,16 +72,9 @@ type PgArrayFloat []float64
 
 // Scan sql/database Scan interface
 func (pg *PgArrayFloat) Scan(value any) error {
-	var scan *bufio.Scanner
-	switch v := value.(type) {
-	case []byte:
-		scan = bufio.NewScanner(bytes.NewReader(v))
-	case string:
-		scan = bufio.NewScanner(strings.NewReader(v))
-	case nil:
-		return nil
-	default:
-		return errors.New(`gobatis: not supported type`)
+	scan, err := fetchScanner(value)
+	if scan == nil || err != nil {
+		return err
 	}
 
 	scan.Split(SplitPgArrayType)
@@ -119,7 +104,7 @@ func (pg *PgArrayFloat) Scan(value any) error {
 			return nil
 		}
 	}
-	return errors.New(`gobatis: value not array type`)
+	return errors.New(`gobatis: value not float[]`)
 }
 
 // Value sql/database Value interface
@@ -149,16 +134,9 @@ var (
 
 // Scan sql/database Scan interface
 func (pg *PgArrayString) Scan(value any) error {
-	var scan *bufio.Scanner
-	switch v := value.(type) {
-	case []byte:
-		scan = bufio.NewScanner(bytes.NewReader(v))
-	case string:
-		scan = bufio.NewScanner(strings.NewReader(v))
-	case nil:
-		return nil
-	default:
-		return errors.New(`gobatis: not supported type`)
+	scan, err := fetchScanner(value)
+	if scan == nil || err != nil {
+		return err
 	}
 
 	scan.Split(SplitPgArrayStringType)
@@ -207,7 +185,7 @@ func (pg *PgArrayString) Scan(value any) error {
 			return nil
 		}
 	}
-	return errors.New(`gobatis: value not array type`)
+	return errors.New(`gobatis: value not text/varchar/char[]`)
 }
 
 // Value sql/database Value interface
@@ -236,16 +214,9 @@ type PgArrayBool []bool
 
 // Scan sql/database Scan interface
 func (pg *PgArrayBool) Scan(value any) error {
-	var scan *bufio.Scanner
-	switch v := value.(type) {
-	case []byte:
-		scan = bufio.NewScanner(bytes.NewReader(v))
-	case string:
-		scan = bufio.NewScanner(strings.NewReader(v))
-	case nil:
-		return nil
-	default:
-		return errors.New(`gobatis: not supported type`)
+	scan, err := fetchScanner(value)
+	if scan == nil || err != nil {
+		return err
 	}
 
 	scan.Split(SplitPgArrayType)
@@ -279,7 +250,7 @@ func (pg *PgArrayBool) Scan(value any) error {
 		}
 	}
 errorNotArrayBoolType:
-	return errors.New(`gobatis: value not array type`)
+	return errors.New(`gobatis: value not bool[]`)
 }
 
 // Value sql/database Value interface
@@ -298,145 +269,6 @@ func (pg *PgArrayBool) Value() (driver.Value, error) {
 			b.WriteString(`,`)
 		}
 	}
-	b.WriteString(`}`)
-	return b.String(), nil
-}
-
-// PgArrayRecord postgresql array record
-type PgArrayRecord [][]string
-
-var (
-	ArrayRecordReplacer        = strings.NewReplacer(`\"\"`, `"`, `\",`, ``, `\")`, ``, `\\\\`, `\`)
-	ArrayRecordReverseReplacer = strings.NewReplacer(`"`, `\"\"`, `\`, `\\\\`)
-)
-
-// Scan sql/database Scan interface
-func (pg *PgArrayRecord) Scan(value any) error {
-	var scan *bufio.Scanner
-	switch v := value.(type) {
-	case []byte:
-		scan = bufio.NewScanner(bytes.NewReader(v))
-	case string:
-		scan = bufio.NewScanner(strings.NewReader(v))
-	case nil:
-		return nil
-	default:
-		return errors.New(`gobatis: not supported type`)
-	}
-	scan.Split(SplitPgArrayRecordType)
-	var recordItem []string
-	var detail strings.Builder
-
-	for scan.Scan() {
-		text := scan.Text()
-		if text != `{` {
-			goto errorRecordArrayType
-		}
-
-	nextRecord:
-		recordItem = nil
-		for scan.Scan() {
-			text = scan.Text()
-			if text != `"` {
-				continue
-			}
-
-			if !scan.Scan() {
-				goto errorRecordArrayType
-			}
-			text = scan.Text()
-			if text != `(` {
-				goto errorRecordArrayType
-			}
-
-			for scan.Scan() {
-				text = scan.Text()
-
-				if text == `\` {
-					detail.Reset()
-					for scan.Scan() {
-						text = scan.Text()
-						if text != `"` {
-							continue
-						}
-
-						// text body
-						for scan.Scan() {
-							text = scan.Text()
-							detail.WriteString(text)
-
-							if strings.HasSuffix(detail.String(), `\",`) {
-								goto addItem
-							} else if strings.HasSuffix(detail.String(), `\")`) {
-								goto addItem
-							}
-						}
-						goto errorRecordArrayType
-					}
-				}
-			addItem:
-				if text == `,` {
-					recordItem = append(recordItem, ArrayRecordReplacer.Replace(detail.String()))
-					detail.Reset()
-					continue
-				}
-				if text == `)` {
-					recordItem = append(recordItem, ArrayRecordReplacer.Replace(detail.String()))
-					detail.Reset()
-					break
-				}
-
-				detail.WriteString(text)
-			}
-
-			for scan.Scan() {
-				text = scan.Text()
-				if text == `"` {
-					continue
-				}
-				if text == `,` {
-					*pg = append(*pg, recordItem)
-					goto nextRecord
-				}
-				if text == `}` {
-					break
-				}
-			}
-		}
-
-		if text == `}` {
-			*pg = append(*pg, recordItem)
-			return nil
-		}
-	}
-errorRecordArrayType:
-	return errors.New(`gobatis: value not record[] type`)
-}
-
-// Value sql/database Value interface
-func (pg *PgArrayRecord) Value() (driver.Value, error) {
-	var b strings.Builder
-	b.Grow(64)
-	b.WriteString(`{`)
-
-	for i, v := range *pg {
-		b.WriteString(`"(`)
-		for j, item := range v {
-			item = ArrayRecordReverseReplacer.Replace(item)
-			if bytes.IndexAny([]byte(item), `, "`) != -1 {
-				item = `\"` + item + `\"`
-			}
-			b.WriteString(item)
-			if j != len(v)-1 {
-				b.WriteString(`,`)
-			}
-		}
-		b.WriteString(`)"`)
-		if i != len(*pg)-1 {
-			b.WriteString(`,`)
-		}
-	}
-
 	b.WriteString(`}`)
 	return b.String(), nil
 }

@@ -214,10 +214,17 @@ type Example struct {
   + `bool[]` 使用 `&gobatis.PgArrayBool{}` 映射
   + `float[]`, `float4[]`, `float8[]` 使用 `&gobatis.PgArrayFloat{}` 映射
   + `record[]` 使用 `&gobatis.PgArrayRecord{}` 映射
+  + `line[]` 使用 `&gobatis.PgArrayLine{}` 映射
+  + `point[]` 使用 `&gobatis.PgArrayPoint{}` 映射
+  + `polygon[]` 使用 `&gobatis.PgArrayPolygon{}` 映射
+  + `circle[]` 使用 `&gobatis.PgArrayCircle{}` 映射
+  + `box[]` 使用 `&gobatis.PgArrayBox{}` 映射
+  + `path[]` 使用 `&gobatis.PgArrayPath{}` 映射
+  + `lseg[]` 使用 `&gobatis.PgArrayLSeg{}` 映射
   + 其他的数组类型 都可以使用 `&gobatis.PgArrayString{}` 映射
   + 无法解析的类型，可以提交 `issue` 进行解决
 
-+ 自定义类型
++ 自定义类型(通过 `create type as (xxx)` 创建的类型)
   + 使用 `&gobatis.PgRecord{}` 映射
 
 + 自定义类型数组
@@ -229,6 +236,23 @@ type Example struct {
 + 点类型
   + 使用 `&gobatis.PgPoint{}` 映射
 
++ 线类型
+  + 使用 `&gobatis.PgLine{}` 映射  
+
++ 多边形类型
+  + 使用 `&gobatis.PgPolygon{}` 映射
+
++ 线段片段类型
+  + 使用 `&gobatis.PgLSeg{}` 映射
+
++ 盒子类型
+  + 使用 `&gobatis.PgBox{}` 映射
+
++ 路径类型
+  + 使用 `&gobatis.PgPath{}` 映射
+
++ 圆类型
+  + 使用 `&gobatis.PgCircle{}` 映射
 
 **[ PostGIS ]** 对于 `PostGIS` 中的以下类型的支持后续视情况迭代跟进
 - `POINT` 二维 或者 三维 点类型
@@ -359,7 +383,7 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
 
 ### 动态SQL
 
-**gobatis**的动态SQL依赖于xml模板
+**gobatis** 采用 `xml` 模板实现动态编程得到 `SQL`
 
 **[ 注意 ]**:
 由于 `xml` 规范的原因，以下字符需要转义：
@@ -708,4 +732,3 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
   - bitushr(int, int)
 
 * 具体的明细内容参考 expr-lang/expr [Language Definition](https://expr-lang.org/docs/language-definition#float)
-

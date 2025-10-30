@@ -2,13 +2,17 @@ package gobatis
 
 import (
 	"strconv"
+	"strings"
 	"time"
 )
 
-// type convert tools function
+// AsInt type convert tools function
 // contains: int64, byte, rune, float64, bool, string
-
-// AsInt convert string to int64
+// time.Time
+// simple example:
+//
+// Parse string into int64
+// v, _ := AsInt("10")
 func AsInt(v string) (int64, error) {
 	return strconv.ParseInt(v, 10, 64)
 }
@@ -44,6 +48,22 @@ func AsString(v string) string {
 	return v
 }
 
+// DateTime type convert tools function
+// contains: int64, byte, rune, float64, bool, string
+// time.Time
+// simple example:
+//
+// Parse string into Time
+// 3. tq, _ := AsDateTime("2021-01-01", TimeFormat(`Y-m-d`).AsTimeFormat().String())
+//	  println(tq.Format(TimeFormatYmdInCN))
+//
+// or you can use AsTime() function
+//	dt, _ := TimeFormat(`Y-m-d`).AsTimeFormat().AsTime("2021-01-01")
+//	println(dt.Format(TimeFormatYmdInCN)
+//
+// also, you can simplely use like this:
+//  dt, _ := TimeFormatYmd.AsTime("2021-01-01")
+//  println(dt.Format(TimeFormatYmdInCN)
 type DateTime time.Time
 
 // NewDateTimeFromTime create DateTime from time.Time
@@ -54,6 +74,11 @@ func NewDateTimeFromTime(t time.Time) DateTime {
 // NewDateTimeFromNow create DateTime from now
 func NewDateTimeFromNow() DateTime {
 	return NewDateTimeFromTime(time.Now())
+}
+
+// ToTime convert DateTime to time.Time
+func (dt DateTime) ToTime() time.Time {
+	return time.Time(dt)
 }
 
 // StartOfMonth return start of month
@@ -163,8 +188,109 @@ func (dt DateTime) Format(format TimeFormat) string {
 	return time.Time(dt).Format(string(format))
 }
 
-// AsDate convert string to time.Time
-func AsDate(v string, format string) (DateTime, error) {
+// Equal compare two DateTime
+func (dt DateTime) Equal(t DateTime) bool {
+	return time.Time(dt).Equal(time.Time(t))
+}
+
+// EqualInTime compare DateTime with time.Time is Equal
+func (dt DateTime) EqualInTime(t time.Time) bool {
+	return time.Time(dt).Equal(t)
+}
+
+// BeforeOrEqual compare DateTime with another DateTime
+func (dt DateTime) BeforeOrEqual(t DateTime) bool {
+	return dt.Before(t) || dt.Equal(t)
+}
+
+// Unix return unix timestamp
+func (dt DateTime) Unix() int64 {
+	return time.Time(dt).Unix()
+}
+
+// UnixNano return unix timestamp with nanosecond
+func (dt DateTime) UnixNano() int64 {
+	return time.Time(dt).UnixNano()
+}
+
+// Year return year
+func (dt DateTime) Year() int {
+	return time.Time(dt).Year()
+}
+
+// Month return month
+func (dt DateTime) Month() time.Month {
+	return time.Time(dt).Month()
+}
+
+// Day return day
+func (dt DateTime) Day() int {
+	return time.Time(dt).Day()
+}
+
+// Hour return hour
+func (dt DateTime) Hour() int {
+	return time.Time(dt).Hour()
+}
+
+// Minute return minute
+func (dt DateTime) Minute() int {
+	return time.Time(dt).Minute()
+}
+
+// Second return second
+func (dt DateTime) Second() int {
+	return time.Time(dt).Second()
+}
+
+// Nanosecond return nanosecond
+func (dt DateTime) Nanosecond() int {
+	return time.Time(dt).Nanosecond()
+}
+
+// IsZero return true if the DateTime is zero
+func (dt DateTime) IsZero() bool {
+	return time.Time(dt).IsZero()
+}
+
+// Before return true if the DateTime is before another DateTime
+func (dt DateTime) Before(t DateTime) bool {
+	return time.Time(dt).Before(time.Time(t))
+}
+
+// BeforeInTime return true if the DateTime is before another time.Time
+func (dt DateTime) BeforeInTime(t time.Time) bool {
+	return time.Time(dt).Before(t)
+}
+
+// After return true if the DateTime is after another DateTime
+func (dt DateTime) After(t DateTime) bool {
+	return time.Time(dt).After(time.Time(t))
+}
+
+// AfterInTime return true if the DateTime is after another time.Time
+func (dt DateTime) AfterInTime(t time.Time) bool {
+	return time.Time(dt).After(t)
+}
+
+// AsDateTime type convert tools function
+// contains: int64, byte, rune, float64, bool, string
+// time.Time
+// simple example:
+//
+// Parse string into Time
+// 3. tq, _ := AsDateTime("2021-01-01", TimeFormat(`Y-m-d`).AsTimeFormat().String())
+//	  println(tq.Format(TimeFormatYmdInCN))
+//
+// or you can use AsTime() function
+//	dt, _ := TimeFormat(`Y-m-d`).AsTimeFormat().AsTime("2021-01-01")
+//	println(dt.Format(TimeFormatYmdInCN)
+//
+// also, you can simplely use like this:
+//  dt, _ := TimeFormatYmd.AsTime("2021-01-01")
+//  println(dt.Format(TimeFormatYmdInCN)
+// AsDateTime convert string to DateTime
+func AsDateTime(v string, format string) (DateTime, error) {
 	tq, err := time.Parse(format, v)
 	return NewDateTimeFromTime(tq), err
 }
@@ -174,18 +300,100 @@ func AsLocation(v string) (*time.Location, error) {
 	return time.LoadLocation(v)
 }
 
+// TimeFormat type convert tools function
+// simple example:
+//
+// Parse string into Time
+//
+// 3. tq, _ := AsDateTime("2021-01-01", TimeFormat(`Y-m-d`).AsTimeFormat().String())
+//	  println(tq.Format(TimeFormatYmdInCN))
+//
+// or you can use AsTime() function
+//
+//	dt, _ := TimeFormat(`Y-m-d`).AsTimeFormat().AsTime("2021-01-01")
+//	println(dt.Format(TimeFormatYmdInCN)
+//
+// also, you can simplely use like this:
+//
+//  dt, _ := TimeFormatYmd.AsTime("2021-01-01")
+//  println(dt.Format(TimeFormatYmdInCN)
 type TimeFormat string
 
 const (
-	TimeFormatYmd             TimeFormat = "2006-1-2"
-	TimeFormatYmdWithSlash    TimeFormat = "2006/1/2"
-	TimeFormatYmdInCN         TimeFormat = "2006年1月2日"
-	TimeFormatYmdHms          TimeFormat = "2006-1-2 15:04:05"
-	TimeFormatYmdHmsWithSlash TimeFormat = "2006/1/2 15:04:05"
-	TimeFormatYmdHmsInCN      TimeFormat = "2006年1月2日 15点04分05"
-	TimeFormatHms             TimeFormat = "15:04:05"
-	TimeFormatHmsInCN         TimeFormat = "15点04分05"
+	TimeFormatY           TimeFormat = "2006"
+	TimeFormatYInCN       TimeFormat = "2006年"
+	TimeFormatYm          TimeFormat = "2006-1"
+	TimeFormatMy          TimeFormat = "1-2006"
+	TimeFormatYmInCN      TimeFormat = "2006年1月"
+	TimeFormatMyInCN      TimeFormat = "1月2006年"
+	TimeFormatYmWithSlash TimeFormat = "2006/1"
+	TimeFormatMyWithSlash TimeFormat = "1/2006"
+
+	TimeFormatYmd                  TimeFormat = "2006-1-2"
+	TimeFormatYmdWithSlash         TimeFormat = "2006/1/2"
+	TimeFormatYmdInCN              TimeFormat = "2006年1月2日"
+	TimeFormatYmdHms               TimeFormat = "2006-1-2 15:04:05"
+	TimeFormatYmdHmsWithSlash      TimeFormat = "2006/1/2 15:04:05"
+	TimeFormatYmdHmsInCN           TimeFormat = "2006年1月2日 15点04分05"
+	TimeFormatYmdHmsWithSecondInCN TimeFormat = "2006年1月2日 15点04分05秒"
+	TimeFormatHms                  TimeFormat = "15:04:05"
+	TimeFormatHmsInCN              TimeFormat = "15点04分05"
+	TimeFormatHmsWithSecondInCN    TimeFormat = "15点04分05秒"
+
+	TimeFormatDmyHms TimeFormat = "2/1/2006 15:04:05"
+	TimeFormatDmyHis TimeFormat = TimeFormatDmyHms
+
+	TimeFormatMdy TimeFormat = "1-2-2006"
+
+	TimeFormatYmdHis               TimeFormat = TimeFormatYmdHms
+	TimeFormatYmdHisWithSlash      TimeFormat = TimeFormatYmdHmsWithSlash
+	TimeFormatYmdHisInCN           TimeFormat = TimeFormatYmdHmsInCN
+	TimeFormatHis                  TimeFormat = TimeFormatHms
+	TimeFormatHisInCN              TimeFormat = TimeFormatHmsInCN
+	TimeFormatYmdHisWithSecondInCN TimeFormat = TimeFormatYmdHmsWithSecondInCN
+	TimeFormatHisWithSecondInCN    TimeFormat = TimeFormatHmsWithSecondInCN
+
+	TimeFormatRFC3339        TimeFormat = time.RFC3339
+	TimeFormatRFC3339Nano    TimeFormat = time.RFC3339Nano
+	TimeFormatRFC822         TimeFormat = time.RFC822
+	TimeFormatRFC850         TimeFormat = time.RFC850
+	TimeFormatRFC822Z        TimeFormat = time.RFC822Z
+	TimeFormatRFC1123        TimeFormat = time.RFC1123
+	TimeFormatRFC1123Z       TimeFormat = time.RFC1123Z
+	TimeFormatUnixDate       TimeFormat = time.UnixDate
+	TimeFormatANSIC          TimeFormat = time.ANSIC
+	TimeFormatRubyDate       TimeFormat = time.RubyDate
+	TimeFormatDateTimeLayout TimeFormat = time.Layout
+	TimeFormatKitchen        TimeFormat = time.Kitchen
+	TimeFormatStamp          TimeFormat = time.Stamp
+	TimeFormatStampMilli     TimeFormat = time.StampMilli
+	TimeFormatStampMicro     TimeFormat = time.StampMicro
+	TimeFormatStampNano      TimeFormat = time.StampNano
 )
+
+var replacerYmdHis = strings.NewReplacer(
+	"Y", "2006",
+	"y", "06",
+	"a", "pm",
+	"A", "PM",
+	"m", "1",
+	"d", "2",
+	"H", "15",
+	"h", "03",
+	"g", "3",
+	"i", "04",
+	"s", "05",
+)
+
+// String return TimeFormat
+func (tf TimeFormat) String() string {
+	return string(tf)
+}
+
+// AsTimeFormat convert TimeFormat to time.Time format
+func (tf TimeFormat) AsTimeFormat() TimeFormat {
+	return TimeFormat(replacerYmdHis.Replace(string(tf)))
+}
 
 // AsTime convert string to time.Time
 func (tf TimeFormat) AsTime(v string) (DateTime, error) {
