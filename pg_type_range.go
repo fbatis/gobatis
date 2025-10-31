@@ -207,7 +207,7 @@ func (pg *PgArrayRange) Scan(value any) error {
 		}
 	}
 errorNotValidPgArrayRange:
-	return errors.New("gobatis: valud not range[]")
+	return errors.New("gobatis: value not range[]")
 }
 
 // Value sql/database Value interface

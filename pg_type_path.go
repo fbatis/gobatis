@@ -24,11 +24,11 @@ func (pg *PgPath) Scan(value any) error {
 	for scan.Scan() {
 		text := scan.Text()
 		if text == `(` {
-			pg.Open = true
+			pg.Open = false
 			goto newPoint
 		}
 		if text == `[` {
-			pg.Open = false
+			pg.Open = true
 			goto newPoint
 		}
 		goto errorNotValidPgPath
@@ -72,13 +72,13 @@ func (pg *PgPath) Scan(value any) error {
 					pg.Points = append(pg.Points, point)
 					goto newPoint
 				case `)`:
-					if !pg.Open {
+					if pg.Open {
 						goto errorNotValidPgPath
 					}
 					pg.Points = append(pg.Points, point)
 					return nil
 				case `]`:
-					if pg.Open {
+					if !pg.Open {
 						goto errorNotValidPgPath
 					}
 					pg.Points = append(pg.Points, point)
@@ -97,9 +97,9 @@ func (pg *PgPath) Value() (driver.Value, error) {
 	builder := strings.Builder{}
 	builder.Grow(64)
 	if pg.Open {
-		builder.WriteString(`(`)
-	} else {
 		builder.WriteString(`[`)
+	} else {
+		builder.WriteString(`(`)
 	}
 
 	for i, point := range pg.Points {
@@ -116,9 +116,9 @@ func (pg *PgPath) Value() (driver.Value, error) {
 	}
 
 	if pg.Open {
-		builder.WriteString(`)`)
-	} else {
 		builder.WriteString(`]`)
+	} else {
+		builder.WriteString(`)`)
 	}
 
 	return builder.String(), nil
@@ -150,11 +150,11 @@ func (pg *PgArrayPath) Scan(value any) error {
 			path := &PgPath{}
 			for scan.Scan() {
 				text := scan.Text()
-				if text == `(` {
+				if text == `[` {
 					path.Open = true
 					goto newPoint
 				}
-				if text == `[` {
+				if text == `(` {
 					path.Open = false
 					goto newPoint
 				}
@@ -199,13 +199,13 @@ func (pg *PgArrayPath) Scan(value any) error {
 							path.Points = append(path.Points, point)
 							goto newPoint
 						case `)`:
-							if !path.Open {
+							if path.Open {
 								goto errorNotValidPgArrayPath
 							}
 							path.Points = append(path.Points, point)
 							goto endOrNext
 						case `]`:
-							if path.Open {
+							if !path.Open {
 								goto errorNotValidPgArrayPath
 							}
 							path.Points = append(path.Points, point)
@@ -246,9 +246,9 @@ func (pg *PgArrayPath) Value() (driver.Value, error) {
 
 	for i, path := range *pg {
 		if path.Open {
-			builder.WriteString(`"(`)
-		} else {
 			builder.WriteString(`"[`)
+		} else {
+			builder.WriteString(`"(`)
 		}
 
 		for i, point := range path.Points {
@@ -265,9 +265,9 @@ func (pg *PgArrayPath) Value() (driver.Value, error) {
 		}
 
 		if path.Open {
-			builder.WriteString(`)"`)
-		} else {
 			builder.WriteString(`]"`)
+		} else {
+			builder.WriteString(`)"`)
 		}
 		if i != len(*pg)-1 {
 			builder.WriteString(`,`)
