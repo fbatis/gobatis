@@ -199,9 +199,9 @@ type Example struct {
 }
 ```
 
-正如上面看到的那样, 我们可以使用 `json` tag来让结构体与数据库字段进行映射, 对应的我们也支持更多 `tag`:
+正如上面看到的那样, 我们可以使用 `json` **tag** 来让结构体与数据库字段进行映射, 对应的我们也支持更多 `tag`:
 
-`leopard`, `gorm`, `expr`, `db` `sql` 都是兼容的. 建议大家使用 `json` tag即可, 不用增加复杂度。
+`json`, `sql`, `db`, `expr`, `leopard`, `gorm` 都是兼容的. 建议大家使用 `json` **tag** 即可, 不用增加复杂度。
 
 
 ## Postgres 复杂类型支持
@@ -221,7 +221,7 @@ type Example struct {
   + `box[]` 使用 `&gobatis.PgArrayBox{}` 映射
   + `path[]` 使用 `&gobatis.PgArrayPath{}` 映射
   + `lseg[]` 使用 `&gobatis.PgArrayLSeg{}` 映射
-  + 其他的数组类型 都可以使用 `&gobatis.PgArrayString{}` 映射
+  + `int4range[]`, `int8range[]`, `numrange[]`, `tsrange[]`, `tstzrange[]`, `daterange[]` 使用 `&gobatis.PgArrayRange{}` 映射
   + 无法解析的类型，可以提交 `issue` 进行解决
 
 + 自定义类型(通过 `create type as (xxx)` 创建的类型)

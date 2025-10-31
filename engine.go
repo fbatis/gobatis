@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -16,13 +15,15 @@ import (
 )
 
 var (
-	ErrorNotFound              = errors.New(`record not found`)
-	ErrorInvalidScanRowType    = errors.New(`ScanRow: non-pointer of dest`)
-	ErrorInvalidScanSliceType  = errors.New(`ScanSlice: non-pointer of dest`)
-	ErrorNowRowsFound          = errors.New(`no rows found`)
-	ErrorMapperCallFirst       = errors.New(`gobatis: Mapper() must be invoked, before Bind`)
-	ErrorExecuteFailedWithType = errors.New(`gobatis: Execute: invalid type`)
-	ErrorDestCantBeNil         = errors.New("gobatis: Dest can't be nil")
+	ErrorNotFound                  = errors.New(`gobatis: record not found`)
+	ErrorInvalidScanRowType        = errors.New(`scanRow: non-pointer of dest`)
+	ErrorInvalidScanSliceType      = errors.New(`scanSlice: non-pointer of dest`)
+	ErrorNowRowsFound              = errors.New(`no rows found`)
+	ErrorMapperCallFirst           = errors.New(`gobatis: Mapper() must be invoked, before Bind`)
+	ErrorExecuteFailedWithType     = errors.New(`gobatis: Execute: invalid type`)
+	ErrorDestCantBeNil             = errors.New("gobatis: dest can't be nil")
+	ErrorBindArgsNeedBeMapOrStruct = errors.New(`gobatis: Args need be map or struct`)
+	ErrorPreparedStatementsEmpty   = errors.New(`gobatis: prepared statements empty`)
 
 	timeType    = reflect.TypeOf(time.Time{})
 	timePtrType = reflect.TypeOf(&time.Time{})
@@ -67,7 +68,12 @@ const (
 )
 
 type Logger interface {
-	Log(ctx context.Context, level int, format string, args ...any)
+	// Log
+	// param level: 0:debug, 1:info, 2:error
+	// param duration: go time.Duration
+	// param sql: prepared sql
+	// param args: prepared sql args.
+	Log(ctx context.Context, level int, duration int64, sql string, args ...any)
 }
 
 type DB struct {
@@ -105,6 +111,9 @@ type DB struct {
 
 	// open driver name
 	driverName string
+
+	// inner use
+	recordLog bool
 }
 
 // WithLogger set logger
@@ -152,6 +161,7 @@ func Open(driverName, dataSourceName string, opts ...func(*DB)) (*DB, error) {
 		rows:         nil,
 		ctx:          context.TODO(),
 		driverName:   strings.ToLower(driverName),
+		recordLog:    true,
 	}
 	for _, opt := range opts {
 		opt(ret)
@@ -194,6 +204,7 @@ func (b *DB) Clone() *DB {
 		ctx:          b.ctx,
 		bindVars:     b.bindVars,
 		logger:       b.logger,
+		recordLog:    b.recordLog,
 	}
 }
 
@@ -369,9 +380,16 @@ func (b *DB) Transaction(fn func(tx *DB) error) (err error) {
 func (b *DB) RawQuery(query string, args ...any) *DB {
 	db := b.Clone()
 
-	if db.logger != nil {
-		db.logger.Log(db.ctx, LogLevelDebug, query, args...)
-	}
+	startTime := time.Now()
+	defer func() {
+		if db.logger != nil && db.recordLog {
+			logLevel := LogLevelDebug
+			if db.Error != nil {
+				logLevel = LogLevelError
+			}
+			db.logger.Log(db.ctx, logLevel, time.Now().Sub(startTime).Nanoseconds(), query, args...)
+		}
+	}()
 
 	if db.tx != nil {
 		db.rows, db.Error = db.tx.QueryContext(db.ctx, query, args...)
@@ -391,9 +409,17 @@ func (b *DB) RawExec(query string, args ...any) *DB {
 	}
 
 	db := b.Clone()
-	if db.logger != nil {
-		db.logger.Log(db.ctx, LogLevelDebug, query, args...)
-	}
+
+	startTime := time.Now()
+	defer func() {
+		if db.logger != nil {
+			logLevel := LogLevelDebug
+			if db.Error != nil {
+				logLevel = LogLevelError
+			}
+			db.logger.Log(db.ctx, logLevel, time.Now().Sub(startTime).Nanoseconds(), query, args...)
+		}
+	}()
 
 	if db.tx != nil {
 		result, err = db.tx.ExecContext(db.ctx, query, args...)
@@ -420,21 +446,31 @@ func (b *DB) Find(dest any) *DB {
 		return b
 	}
 
-	var t = b
-	switch b.mapperType {
+	db := b.Clone()
+	switch db.mapperType {
 	// to support postgres-like sql: insert/update/delete xxx returning xxx
 	case mapperInsert, mapperUpdate, mapperDelete:
-		statements, args, err := b.bindVars.Vars()
+		statements, args, err := db.bindVars.Vars()
 		if err != nil {
-			b.Error = err
-			return b
+			db.Error = err
+			return db
 		}
-		t = b.RawQuery(statements, args...)
+		startTime := time.Now()
+		defer func() {
+			if db.logger != nil && db.recordLog {
+				logLevel := LogLevelDebug
+				if db.Error != nil {
+					logLevel = LogLevelError
+				}
+				db.logger.Log(db.ctx, logLevel, time.Now().Sub(startTime).Nanoseconds(), statements, args...)
+			}
+		}()
+		db.recordLog = false
+		db = db.RawQuery(statements, args...)
+		db.recordLog = true
 	default:
 		// omit
 	}
-
-	db := t.Clone()
 
 	if db.rows == nil {
 		db.Error = ErrorNowRowsFound
@@ -457,6 +493,16 @@ func (b *DB) Find(dest any) *DB {
 // fetch data: db.Mapper('id').Args(variables).Find(dest).Error
 //
 // otherwise: db.Mapper('id').Args(variables).Execute().Error
+//
+// normal state, you can call Mapper(`xxx`) to fetch the mapper
+//
+// but in some conditions, this is slower, because the find order follow the order of `select`, `insert`, `update`, `delete`
+//
+// the update & delete mapper list is the last one to fetch, so if your mapper type you known, you can call
+//
+// SelectMapper(`xxx`), InsertMapper(`xxx`), UpdateMapper(`xxx`), DeleteMapper(`xxx`) seperator
+//
+// to speed up or accelerate the operation.
 func (b *DB) Mapper(mapperId string) *DB {
 	if b.Error != nil {
 		return b
@@ -492,10 +538,83 @@ func (b *DB) Mapper(mapperId string) *DB {
 	return db
 }
 
+// SelectMapper Find mapper from select mapper list, if not found, return error
+func (b *DB) SelectMapper(mapperId string) *DB {
+	if b.Error != nil {
+		return b
+	}
+	db := b.Clone()
+
+	if mapper, ok := db.selectMapper[mapperId]; ok {
+		db.mapper = mapper
+		db.mapperType = mapperSelect
+		return db
+	}
+
+	db.Error = fmt.Errorf("gobatis: mapper with id: %s not found", mapperId)
+	return db
+}
+
+// InsertMapper Find mapper from insert mapper list, if not found, return error
+func (b *DB) InsertMapper(mapperId string) *DB {
+	if b.Error != nil {
+		return b
+	}
+	db := b.Clone()
+
+	if mapper, ok := db.insertMapper[mapperId]; ok {
+		db.mapper = mapper
+		db.mapperType = mapperInsert
+		return db
+	}
+
+	db.Error = fmt.Errorf("gobatis: mapper with id: %s not found", mapperId)
+	return db
+}
+
+// UpdateMapper Find mapper from update mapper list, if not found, return error
+func (b *DB) UpdateMapper(mapperId string) *DB {
+	if b.Error != nil {
+		return b
+	}
+	db := b.Clone()
+
+	if mapper, ok := db.updateMapper[mapperId]; ok {
+		db.mapper = mapper
+		db.mapperType = mapperUpdate
+		return db
+	}
+
+	db.Error = fmt.Errorf("gobatis: mapper with id: %s not found", mapperId)
+	return db
+}
+
+// DeleteMapper Find mapper from delete mapper list, if not found, return error
+func (b *DB) DeleteMapper(mapperId string) *DB {
+	if b.Error != nil {
+		return b
+	}
+	db := b.Clone()
+
+	if mapper, ok := db.deleteMapper[mapperId]; ok {
+		db.mapper = mapper
+		db.mapperType = mapperDelete
+		return db
+	}
+
+	db.Error = fmt.Errorf("gobatis: mapper with id: %s not found", mapperId)
+	return db
+}
+
 // Args alias to Bind operation
 func (b *DB) Args(variables interface{}) *DB {
 	return b.Bind(variables)
 }
+
+var (
+	// allow struct tag list
+	tagList = []string{`json`, `sql`, `db`, `expr`, `leopard`, `gorm`}
+)
 
 // Bind variables to mapper
 // generate stmt prepared handler
@@ -518,21 +637,46 @@ func (b *DB) Bind(variables interface{}) *DB {
 		t = t.Elem()
 	}
 
+	switch t.Kind() {
+	case reflect.Map, reflect.Struct:
+	default:
+		db.Error = ErrorBindArgsNeedBeMapOrStruct
+		return db
+	}
+
 	// make sure the input value's type is map
 	// if tag contains foreach, the input' type must be `map`
 	// caller should have known if the variables input was map, he must make sure the input variables
 	// thread-safe.
 	if t.Kind() == reflect.Struct {
-		varBuf, err := json.Marshal(variables)
-		if err != nil {
-			db.Error = err
-			return db
+		var variablesMap = make(map[string]interface{}, 32)
+		value := reflect.ValueOf(variables)
+		for value.Kind() == reflect.Ptr {
+			value = value.Elem()
 		}
-		var variablesMap map[string]interface{}
-		err = json.Unmarshal(varBuf, &variablesMap)
-		if err != nil {
-			db.Error = err
-			return db
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			fieldValue := value.Field(i)
+
+			if field.Anonymous {
+			dealAnonymous:
+				// deal with anonymous field
+				anonymousFieldType := field.Type
+				anonymousFieldValue := fieldValue
+				for j := 0; j < anonymousFieldType.NumField(); j++ {
+					if anonymousFieldType.Field(j).Anonymous {
+						field = anonymousFieldType.Field(j)
+						fieldValue = anonymousFieldValue.Field(j)
+						// embed field goto next for loop
+						goto dealAnonymous
+					}
+					field := anonymousFieldType.Field(j)
+					fieldValue := anonymousFieldValue.Field(j)
+					variablesMap[b.columnName(field)] = fieldValue.Interface()
+				}
+				continue
+			}
+			variablesMap[b.columnName(field)] = fieldValue.Interface()
 		}
 		variables = variablesMap
 	}
@@ -543,6 +687,10 @@ func (b *DB) Bind(variables interface{}) *DB {
 	statements, args, err := db.bindVars.Vars()
 	if err != nil {
 		db.Error = err
+		return db
+	}
+	if statements == `` {
+		db.Error = ErrorPreparedStatementsEmpty
 		return db
 	}
 
@@ -582,9 +730,10 @@ func (b *DB) Execute() *DB {
 	}
 }
 
+// columnName fetch name from struct field
+// first from struct tag list found, if not, use it's field name to lower form.
 func (b *DB) columnName(f reflect.StructField) string {
-	tags := []string{`json`, `expr`, `leopard`, `db`, `gorm`, `sql`}
-	for _, tag := range tags {
+	for _, tag := range tagList {
 		if n, ok := f.Tag.Lookup(tag); ok {
 			for _, piece := range strings.Split(n, `;`) {
 				if !strings.HasPrefix(piece, `column`) {

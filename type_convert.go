@@ -1,6 +1,7 @@
 package gobatis
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -43,9 +44,50 @@ func AsBool(v string) (bool, error) {
 	return strconv.ParseBool(v)
 }
 
-// AsString convert string to string
-func AsString(v string) string {
-	return v
+// AsString convert interface{} to string
+func AsString(v interface{}) (string, error) {
+	switch v := v.(type) {
+	case int:
+		return strconv.Itoa(v), nil
+	case int8:
+		return strconv.FormatInt(int64(v), 10), nil
+	case int16:
+		return strconv.FormatInt(int64(v), 10), nil
+	case int32:
+		return strconv.FormatInt(int64(v), 10), nil
+	case int64:
+		return strconv.FormatInt(v, 10), nil
+	case uint:
+		return strconv.FormatUint(uint64(v), 10), nil
+	case uint8:
+		return strconv.FormatUint(uint64(v), 10), nil
+	case uint16:
+		return strconv.FormatUint(uint64(v), 10), nil
+	case uint32:
+		return strconv.FormatUint(uint64(v), 10), nil
+	case uint64:
+		return strconv.FormatUint(v, 10), nil
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32), nil
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64), nil
+	case time.Time:
+		return v.Format(TimeFormatYmdHis.String()), nil
+	case *time.Time:
+		if v != nil {
+			return v.Format(TimeFormatYmdHis.String()), nil
+		}
+		return ``, fmt.Errorf(`gobatis: value is nil`)
+	case DateTime:
+		return v.Format(TimeFormatYmdHis), nil
+	case *DateTime:
+		if v != nil {
+			return v.Format(TimeFormatYmdHis), nil
+		}
+		return ``, fmt.Errorf(`gobatis: value is nil`)
+	default:
+		return fmt.Sprintf(`%v`, v), nil
+	}
 }
 
 // DateTime type convert tools function

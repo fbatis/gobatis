@@ -40,6 +40,9 @@ var (
 
 	// SplitPgArrayCircleType split string used by bufio.Scanner Split func
 	SplitPgArrayCircleType = SplitByString(`{"<(,)>}`)
+
+	// SplitPgArrayRangeType split string used by bufio.Scanner Split func
+	SplitPgArrayRangeType = SplitByString(`{"[(,)]}`)
 )
 
 // SplitByString split string used by bufio.Scanner Split func

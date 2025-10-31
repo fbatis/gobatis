@@ -201,7 +201,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 		switch v := child.(type) {
 		case *If:
 			ifExist = true
-			if testNode, exist := v.AttrsMap[TestKey]; exist && strings.TrimSpace(testNode) != `` {
+			if testNode, exist := v.AttrsMap[TestKey]; exist && testNode != `` {
 				if ok, err = exprEvaluate(testNode, input.Input); err != nil {
 					return ``, err
 				} else if ok {
@@ -220,7 +220,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 			if ok {
 				continue
 			}
-			if testNode, exist := v.AttrsMap[TestKey]; exist && strings.TrimSpace(testNode) != `` {
+			if testNode, exist := v.AttrsMap[TestKey]; exist && testNode != `` {
 				if ok, err = exprEvaluate(testNode, input.Input); err != nil {
 					return ``, err
 				} else if ok {
@@ -257,7 +257,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 				continue
 			}
 			whenExist = true
-			if testNode, exist := v.AttrsMap[TestKey]; exist && strings.TrimSpace(testNode) != `` {
+			if testNode, exist := v.AttrsMap[TestKey]; exist && testNode != `` {
 				if ok, err = exprEvaluate(testNode, input.Input); err != nil {
 					return ``, err
 				} else if ok {
@@ -302,7 +302,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 			}
 			t := reflect.TypeOf(value)
 			if t == nil {
-				return ``, nil
+				continue
 			}
 
 			for t.Kind() == reflect.Ptr {
@@ -328,11 +328,18 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 					if err != nil {
 						return ``, err
 					}
-					inputMap.SetMapIndex(reflect.ValueOf(item), reflect.ValueOf(sliceItem))
+					// Save the original value of the item key
+					itemValue := reflect.ValueOf(item)
+					previousItemValue := inputMap.MapIndex(itemValue)
+					// Save the original value of the index key
+					arrayIndexValue := reflect.ValueOf(arrayIndex)
+					previousArrayIndexValue := inputMap.MapIndex(arrayIndexValue)
+
+					inputMap.SetMapIndex(itemValue, reflect.ValueOf(sliceItem))
 					if arrayIndex != `` {
 						arrayIndexKey = NewUuid()
 						inputMap.SetMapIndex(reflect.ValueOf(arrayIndexKey), reflect.ValueOf(i))
-						inputMap.SetMapIndex(reflect.ValueOf(arrayIndex), reflect.ValueOf(i))
+						inputMap.SetMapIndex(arrayIndexValue, reflect.ValueOf(i))
 						input.uuidMap.Store(arrayIndexKey, arrayIndex)
 					}
 					var newText string
@@ -343,16 +350,21 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 					}); err != nil {
 						return ``, err
 					}
-					matches := variable.FindAllString(newText, -1)
-					for _, match := range matches {
-						if arrayIndex != `` {
+
+					// restore the item & index value if in original input value
+					inputMap.SetMapIndex(itemValue, previousItemValue)
+					if arrayIndex != `` {
+						// restore array index value from original input value
+						inputMap.SetMapIndex(arrayIndexValue, previousArrayIndexValue)
+						matches := variable.FindAllString(newText, -1)
+						for _, match := range matches {
 							newText = strings.NewReplacer(match, strings.NewReplacer(
 								arrayIndex,
 								arrayIndexKey,
 							).Replace(match)).Replace(newText)
 						}
 					}
-					matches = variable.FindAllString(newText, -1)
+					matches := variable.FindAllString(newText, -1)
 					for _, match := range matches {
 						newText = strings.NewReplacer(
 							match,
@@ -365,7 +377,6 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 					}
 					textArr = append(textArr, newText)
 				}
-				inputMap.SetMapIndex(reflect.ValueOf(item), reflect.Value{})
 				builder.WriteString(strings.Join(textArr, separator))
 			default:
 				return ``, ErrorForeachStatementIsNotArrayOrMap
