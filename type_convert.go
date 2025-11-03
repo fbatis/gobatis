@@ -44,7 +44,9 @@ func AsBool(v string) (bool, error) {
 	return strconv.ParseBool(v)
 }
 
+// deprecated
 // AsString convert interface{} to string
+// Not recommend to use AsString.
 func AsString(v interface{}) (string, error) {
 	switch v := v.(type) {
 	case int:
@@ -73,6 +75,12 @@ func AsString(v interface{}) (string, error) {
 		return strconv.FormatFloat(v, 'f', -1, 64), nil
 	case time.Time:
 		return v.Format(TimeFormatYmdHis.String()), nil
+	case string:
+		return v, nil
+	case []byte:
+		return string(v), nil
+	case []rune:
+		return string(v), nil
 	case *time.Time:
 		if v != nil {
 			return v.Format(TimeFormatYmdHis.String()), nil
@@ -203,7 +211,7 @@ func (dt DateTime) StartOfDay() DateTime {
 }
 
 // EndOfDay return end of day
-// some database engine like mysql, the precison of datetime is microseconds, so we omit the nsec parameters.
+// some database engine like mysql, the precison of datetime is microseconds, so we omit the nsec part.
 // if you want to set the nsec, you can use DateTime.AddDurationInText() or DateTime.AddDuration() to set the nsec.
 func (dt DateTime) EndOfDay() DateTime {
 	t := time.Time(dt)
