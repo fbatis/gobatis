@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/fbatis/expr"
+	"github.com/expr-lang/expr"
 
 	"github.com/google/uuid"
 )
@@ -208,7 +208,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 					if innerText, err := intervalEvaluate(ctx, v.Children, input); err != nil {
 						return ``, err
 					} else {
-						builder.WriteString(innerText)
+						builder.WriteString(` ` + innerText + ` `)
 					}
 				}
 			}
@@ -227,7 +227,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 					if innerText, err := intervalEvaluate(ctx, v.Children, input); err != nil {
 						return ``, err
 					} else {
-						builder.WriteString(innerText)
+						builder.WriteString(` ` + innerText + ` `)
 					}
 				}
 			}
@@ -242,14 +242,14 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 			if innerText, err := intervalEvaluate(ctx, v.Children, input); err != nil {
 				return ``, err
 			} else {
-				builder.WriteString(innerText)
+				builder.WriteString(` ` + innerText + ` `)
 			}
 		case *Choose:
 			input.fromChoose = true
 			if innerText, err := intervalEvaluate(ctx, v.Children, input); err != nil {
 				return ``, err
 			} else {
-				builder.WriteString(innerText)
+				builder.WriteString(` ` + innerText + ` `)
 			}
 			input.fromChoose = false
 		case *When:
@@ -264,7 +264,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 					if innerText, err := intervalEvaluate(ctx, v.Children, input); err != nil {
 						return ``, err
 					} else {
-						builder.WriteString(innerText)
+						builder.WriteString(` ` + innerText + ` `)
 					}
 				}
 			}
@@ -278,7 +278,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 			if innerText, err := intervalEvaluate(ctx, v.Children, input); err != nil {
 				return ``, err
 			} else {
-				builder.WriteString(innerText)
+				builder.WriteString(` ` + innerText + ` `)
 			}
 		case *Foreach:
 			var collection string
@@ -377,7 +377,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 					}
 					textArr = append(textArr, newText)
 				}
-				builder.WriteString(strings.Join(textArr, separator))
+				builder.WriteString(` ` + strings.Join(textArr, separator) + ` `)
 			default:
 				return ``, ErrorForeachStatementIsNotArrayOrMap
 			}
@@ -396,11 +396,11 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 						}
 					}
 				}
-				if prefix, ok := v.AttrsMap[PrefixKey]; ok {
-					builder.WriteString(prefix)
+				if prefix, ok := v.AttrsMap[PrefixKey]; ok && prefix != `` {
+					builder.WriteString(prefix + ` `)
 				}
 
-				builder.WriteString(innerText)
+				builder.WriteString(` ` + innerText + ` `)
 			}
 		case *Include:
 			if v.RefId == `` {
@@ -428,7 +428,7 @@ func intervalEvaluate(ctx context.Context, children []interface{}, input *Handle
 					innerText = innerText[2:]
 				}
 				if strings.TrimSpace(innerText) != `` {
-					builder.WriteString(` WHERE ` + innerText)
+					builder.WriteString(` WHERE ` + innerText + ` `)
 				}
 			}
 		case *Sql:
