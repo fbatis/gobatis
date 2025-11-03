@@ -119,11 +119,11 @@ import (
 
 ```go main.go
     type Employees struct {
-        EmployeeId       int    `expr:"employee_id"`
-        Name             string `expr:"name"`
-        Department       int    `expr:"department"`
-        PerformanceScore string `expr:"performance_score"`
-        Salary           string `expr:"salary"`
+        EmployeeId       int    `json:"employee_id"`
+        Name             string `json:"name"`
+        Department       int    `json:"department"`
+        PerformanceScore string `json:"performance_score"`
+        Salary           string `json:"salary"`
     }
 
    //go:embed statements/*.xml
@@ -208,51 +208,33 @@ type Example struct {
 
 目前 `gobatis` 支持 `Postgres` 的多种复杂类型包括：
 
-+ 数组类型 (`int[]`, `text[]`, `bool[]`, `float[]`, `record[]`) 等等
-  + `int[]` 使用 `&gobatis.PgArrayInt{}` 映射
-  + `text[]`, `varchar[]`, `char[]` 使用 `&gobatis.PgArrayString{}` 映射
-  + `bool[]` 使用 `&gobatis.PgArrayBool{}` 映射
-  + `float[]`, `float4[]`, `float8[]` 使用 `&gobatis.PgArrayFloat{}` 映射
-  + `record[]` 使用 `&gobatis.PgArrayRecord{}` 映射
-  + `line[]` 使用 `&gobatis.PgArrayLine{}` 映射
-  + `point[]` 使用 `&gobatis.PgArrayPoint{}` 映射
-  + `polygon[]` 使用 `&gobatis.PgArrayPolygon{}` 映射
-  + `circle[]` 使用 `&gobatis.PgArrayCircle{}` 映射
-  + `box[]` 使用 `&gobatis.PgArrayBox{}` 映射
-  + `path[]` 使用 `&gobatis.PgArrayPath{}` 映射
-  + `lseg[]` 使用 `&gobatis.PgArrayLSeg{}` 映射
-  + `int4range[]`, `int8range[]`, `numrange[]`, `tsrange[]`, `tstzrange[]`, `daterange[]` 使用 `&gobatis.PgArrayRange{}` 映射
-  + 无法解析的类型，可以提交 `issue` 进行解决
+| Postgres类型                                                                | gobatis类型              | 解析与回写 |
+|---------------------------------------------------------------------------|------------------------|-------|
+| int[], integer[], int2[], int4[], int8[]                                  | gobatis.PgArrayInt     | √     |
+| text[], varchar[], char[]                                                 | gobatis.PgArrayString  | √     |
+| bool[]                                                                    | gobatis.PgArrayBool    | √     |
+| float[], float4[], float8[]                                               | gobatis.PgArrayFloat   | √     |
+| record[]                                                                  | gobatis.PgArrayRecord  | √     |
+| line[]                                                                    | gobatis.PgArrayLine    | √     |
+| point[]                                                                   | gobatis.PgArrayPoint   | √     |
+| polygon[]                                                                 | gobatis.PgArrayPolygon | √     |
+| circle[]                                                                  | gobatis.PgArrayCircle  | √     |
+| box[]                                                                     | gobatis.PgArrayBox     | √     |
+| path[]                                                                    | gobatis.PgArrayPath    | √     |
+| lseg[]                                                                    | gobatis.PgArrayLSeg    | √     |
+| int4range[], int8range[], numrange[], tsrange[], tstzrange[], daterange[] | gobatis.PgArrayRange   | √     |
+| create type as (xxx) 自定义类型                                                | gobatis.PgRecord       | √     |
+| create type as (xxx) 自定义类型数组                                              | gobatis.PgArrayRecord  | √     |
+| int4range, int8range, numrange, tsrange, tstzrange, daterange             | gobatis.PgRange        | √     |
+| point                                                                     | gobatis.PgPoint        | √     |
+| line                                                                      | gobatis.PgLine         | √     |
+| polygon                                                                   | gobatis.PgPolygon      | √     |
+| lseg                                                                      | gobatis.PgLSeg         | √     |
+| box                                                                       | gobatis.PgBox          | √     |
+| path                                                                      | gobatis.PgPath         | √     |
+| circle                                                                    | gobatis.PgCircle       | √     |
+| PostGIS                                                                   | -                      | ×     |
 
-+ 自定义类型(通过 `create type as (xxx)` 创建的类型)
-  + 使用 `&gobatis.PgRecord{}` 映射
-
-+ 自定义类型数组
-  + 使用 `&gobatis.PgArrayRecord{}` 映射
-
-+ 范围类型
-  + `int4range`, `int8range`, `numrange`, `tsrange`, `tstzrange`, `daterange` 使用 `&gobatis.PgRange{}` 映射
-
-+ 点类型
-  + 使用 `&gobatis.PgPoint{}` 映射
-
-+ 线类型
-  + 使用 `&gobatis.PgLine{}` 映射  
-
-+ 多边形类型
-  + 使用 `&gobatis.PgPolygon{}` 映射
-
-+ 线段片段类型
-  + 使用 `&gobatis.PgLSeg{}` 映射
-
-+ 盒子类型
-  + 使用 `&gobatis.PgBox{}` 映射
-
-+ 路径类型
-  + 使用 `&gobatis.PgPath{}` 映射
-
-+ 圆类型
-  + 使用 `&gobatis.PgCircle{}` 映射
 
 **[ PostGIS ]** 对于 `PostGIS` 中的以下类型的支持后续视情况迭代跟进
 - `POINT` 二维 或者 三维 点类型
@@ -602,7 +584,7 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
 多个内容用 `|` 分隔
 
 
-最后拼接 `prefix` 属性定义的内容。
+最后在内容前拼接 `prefix` 属性定义的内容。
 
 ## expression
 
