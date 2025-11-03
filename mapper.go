@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/expr-lang/expr"
+	"github.com/fbatis/expr"
 
 	"github.com/google/uuid"
 )
