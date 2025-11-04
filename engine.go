@@ -114,6 +114,9 @@ type DB struct {
 
 	// inner use
 	recordLog bool
+
+	// startTime
+	startTime time.Time
 }
 
 // WithLogger set logger
@@ -205,6 +208,7 @@ func (b *DB) Clone() *DB {
 		bindVars:     b.bindVars,
 		logger:       b.logger,
 		recordLog:    b.recordLog,
+		startTime:    b.startTime,
 	}
 }
 
@@ -410,14 +414,13 @@ func (b *DB) RawExec(query string, args ...any) *DB {
 
 	db := b.Clone()
 
-	startTime := time.Now()
 	defer func() {
-		if db.logger != nil {
+		if db.logger != nil && db.recordLog {
 			logLevel := LogLevelDebug
 			if db.Error != nil {
 				logLevel = LogLevelError
 			}
-			db.logger.Log(db.ctx, logLevel, time.Now().Sub(startTime).Nanoseconds(), query, args...)
+			db.logger.Log(db.ctx, logLevel, time.Now().Sub(db.startTime).Nanoseconds(), query, args...)
 		}
 	}()
 
@@ -455,14 +458,13 @@ func (b *DB) Find(dest any) *DB {
 			db.Error = err
 			return db
 		}
-		startTime := time.Now()
 		defer func() {
 			if db.logger != nil && db.recordLog {
 				logLevel := LogLevelDebug
 				if db.Error != nil {
 					logLevel = LogLevelError
 				}
-				db.logger.Log(db.ctx, logLevel, time.Now().Sub(startTime).Nanoseconds(), statements, args...)
+				db.logger.Log(db.ctx, logLevel, time.Now().Sub(db.startTime).Nanoseconds(), statements, args...)
 			}
 		}()
 		db.recordLog = false
@@ -510,6 +512,8 @@ func (b *DB) Mapper(mapperId string) *DB {
 
 	db := b.Clone()
 
+	db.startTime = time.Now()
+
 	if mapper, ok := db.selectMapper[mapperId]; ok {
 		db.mapper = mapper
 		db.mapperType = mapperSelect
@@ -544,6 +548,7 @@ func (b *DB) SelectMapper(mapperId string) *DB {
 		return b
 	}
 	db := b.Clone()
+	db.startTime = time.Now()
 
 	if mapper, ok := db.selectMapper[mapperId]; ok {
 		db.mapper = mapper
@@ -561,6 +566,7 @@ func (b *DB) InsertMapper(mapperId string) *DB {
 		return b
 	}
 	db := b.Clone()
+	db.startTime = time.Now()
 
 	if mapper, ok := db.insertMapper[mapperId]; ok {
 		db.mapper = mapper
@@ -578,6 +584,7 @@ func (b *DB) UpdateMapper(mapperId string) *DB {
 		return b
 	}
 	db := b.Clone()
+	db.startTime = time.Now()
 
 	if mapper, ok := db.updateMapper[mapperId]; ok {
 		db.mapper = mapper
@@ -595,6 +602,7 @@ func (b *DB) DeleteMapper(mapperId string) *DB {
 		return b
 	}
 	db := b.Clone()
+	db.startTime = time.Now()
 
 	if mapper, ok := db.deleteMapper[mapperId]; ok {
 		db.mapper = mapper
