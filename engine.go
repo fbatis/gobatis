@@ -500,7 +500,7 @@ func (b *DB) Find(dest any) *DB {
 //
 // the update & delete mapper list is the last one to fetch, so if your mapper type you known, you can call
 //
-// SelectMapper(`xxx`), InsertMapper(`xxx`), UpdateMapper(`xxx`), DeleteMapper(`xxx`) seperator
+// SelectMapper(`xxx`), InsertMapper(`xxx`), UpdateMapper(`xxx`), DeleteMapper(`xxx`) directly
 //
 // to speed up or accelerate the operation.
 func (b *DB) Mapper(mapperId string) *DB {
@@ -662,7 +662,13 @@ func (b *DB) Bind(variables interface{}) *DB {
 			dealAnonymous:
 				// deal with anonymous field
 				anonymousFieldType := field.Type
+				for anonymousFieldType.Kind() == reflect.Ptr {
+					anonymousFieldType = anonymousFieldType.Elem()
+				}
 				anonymousFieldValue := fieldValue
+				for anonymousFieldValue.Kind() == reflect.Ptr {
+					anonymousFieldValue = anonymousFieldValue.Elem()
+				}
 				for j := 0; j < anonymousFieldType.NumField(); j++ {
 					if anonymousFieldType.Field(j).Anonymous {
 						field = anonymousFieldType.Field(j)
