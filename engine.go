@@ -384,16 +384,12 @@ func (b *DB) Transaction(fn func(tx *DB) error) (err error) {
 func (b *DB) RawQuery(query string, args ...any) *DB {
 	db := b.Clone()
 
-	startTime := time.Now()
-	defer func() {
-		if db.logger != nil && db.recordLog {
-			logLevel := LogLevelDebug
-			if db.Error != nil {
-				logLevel = LogLevelError
-			}
-			db.logger.Log(db.ctx, logLevel, time.Now().Sub(startTime).Nanoseconds(), query, args...)
-		}
-	}()
+	db.startTime = time.Now()
+	db.bindVars = &BindVar{
+		stateSql: query,
+		args:     args,
+		err:      nil,
+	}
 
 	if db.tx != nil {
 		db.rows, db.Error = db.tx.QueryContext(db.ctx, query, args...)
@@ -413,16 +409,12 @@ func (b *DB) RawExec(query string, args ...any) *DB {
 	}
 
 	db := b.Clone()
-
-	defer func() {
-		if db.logger != nil && db.recordLog {
-			logLevel := LogLevelDebug
-			if db.Error != nil {
-				logLevel = LogLevelError
-			}
-			db.logger.Log(db.ctx, logLevel, time.Now().Sub(db.startTime).Nanoseconds(), query, args...)
-		}
-	}()
+	db.startTime = time.Now()
+	db.bindVars = &BindVar{
+		stateSql: query,
+		args:     args,
+		err:      nil,
+	}
 
 	if db.tx != nil {
 		result, err = db.tx.ExecContext(db.ctx, query, args...)
@@ -450,23 +442,25 @@ func (b *DB) Find(dest any) *DB {
 	}
 
 	db := b.Clone()
+	statements, args, err := db.bindVars.Vars()
+	if err != nil {
+		db.Error = err
+		return db
+	}
+	db.recordLog = true
+	defer func() {
+		if db.logger != nil && db.recordLog {
+			logLevel := LogLevelDebug
+			if db.Error != nil {
+				logLevel = LogLevelError
+			}
+			db.logger.Log(db.ctx, logLevel, time.Now().Sub(db.startTime).Nanoseconds(), statements, args...)
+		}
+	}()
+
 	switch db.mapperType {
 	// to support postgres-like sql: insert/update/delete xxx returning xxx
 	case mapperInsert, mapperUpdate, mapperDelete:
-		statements, args, err := db.bindVars.Vars()
-		if err != nil {
-			db.Error = err
-			return db
-		}
-		defer func() {
-			if db.logger != nil && db.recordLog {
-				logLevel := LogLevelDebug
-				if db.Error != nil {
-					logLevel = LogLevelError
-				}
-				db.logger.Log(db.ctx, logLevel, time.Now().Sub(db.startTime).Nanoseconds(), statements, args...)
-			}
-		}()
 		db.recordLog = false
 		db = db.RawQuery(statements, args...)
 		db.recordLog = true
@@ -708,6 +702,7 @@ func (b *DB) Bind(variables interface{}) *DB {
 		return db
 	}
 
+	db.recordLog = false
 	switch db.mapperType {
 	case mapperSelect:
 		return db.RawQuery(statements, args...)
@@ -724,22 +719,26 @@ func (b *DB) Execute() *DB {
 	}
 
 	db := b.Clone()
-	if db.mapper == nil {
-		db.Error = ErrorMapperCallFirst
-		return db
-	}
-
 	statements, args, err := db.bindVars.Vars()
 	if err != nil {
 		db.Error = err
 		return db
 	}
+	defer func() {
+		if db.logger != nil && db.recordLog {
+			logLevel := LogLevelDebug
+			if db.Error != nil {
+				logLevel = LogLevelError
+			}
+			db.logger.Log(db.ctx, logLevel, time.Now().Sub(db.startTime).Nanoseconds(), statements, args...)
+		}
+	}()
 
+	db.recordLog = true
 	switch db.mapperType {
 	case mapperInsert, mapperUpdate, mapperDelete:
 		return db.RawExec(statements, args...)
 	default:
-		db.Error = ErrorExecuteFailedWithType
 		return db
 	}
 }
