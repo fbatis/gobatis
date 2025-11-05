@@ -257,12 +257,8 @@ type BoxCommon struct {
 	Id int `sql:"id"`
 }
 
-type BoxData struct {
-	*BoxCommon
-}
-
 type MOrder struct {
-	BoxData
+	BoxCommon
 	Name      string     `json:"name"`
 	Price     float64    `json:"price"`
 	CreatedAt time.Time  `json:"created_at"`
@@ -271,7 +267,7 @@ type MOrder struct {
 }
 ```
 
-**MOrder** 的内嵌结构体 **BoxData**, 以及 内嵌的 **BoxCommon**结构体。
+**MOrder** 的内嵌结构体 **BoxCommon**结构体。
 
 
 ## Postgres 复杂类型支持
@@ -784,6 +780,7 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
   - bitushr(int, int)
 
 * 具体的明细内容参考 expr-lang/expr [Language Definition](https://expr-lang.org/docs/language-definition#float)
+
 
 
 
