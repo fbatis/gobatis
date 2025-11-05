@@ -2,6 +2,7 @@ package gobatis
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -465,4 +466,92 @@ func (tf TimeFormat) AsTimeInLocationName(v string, locationName string) (DateTi
 	}
 	tq, err := time.ParseInLocation(string(tf), v, loc)
 	return DateTime(tq), err
+}
+
+// columnName fetch name from struct field
+// first from struct tag list found, if not, use it's field name to lower form.
+func columnName(f reflect.StructField) string {
+	for _, tag := range tagList {
+		if n, ok := f.Tag.Lookup(tag); ok {
+			for _, piece := range strings.Split(n, `;`) {
+				if !strings.HasPrefix(piece, `column`) {
+					continue
+				}
+				return piece[strings.Index(piece, `:`)+1:]
+			}
+
+			if strings.Contains(n, `,`) {
+				return n[0:strings.Index(n, `,`)]
+			}
+
+			return n
+		}
+	}
+	return f.Name
+}
+
+// AsMap convert struct to map, remain field name, if not define the following tag:
+// `json`, `sql`, `db`, `expr`, `leopard`, `gorm`
+// only support input param was struct & map, others panic
+func AsMap(v any) Args {
+	if v == nil {
+		return nil
+	}
+
+	t := reflect.TypeOf(v)
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	value := reflect.ValueOf(v)
+	for value.Kind() == reflect.Ptr {
+		value = value.Elem()
+	}
+
+	switch t.Kind() {
+	case reflect.Struct:
+		var data Args
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			fieldValue := value.Field(i)
+			if field.Anonymous {
+			dealAnonymous:
+				// deal with anonymous field
+				anonymousFieldType := field.Type
+				anonymousFieldValue := fieldValue
+				for j := 0; j < anonymousFieldType.NumField(); j++ {
+					if anonymousFieldType.Field(j).Anonymous {
+						field = anonymousFieldType.Field(j)
+						fieldValue = anonymousFieldValue.Field(j)
+						// embed field goto next for loop
+						goto dealAnonymous
+					}
+					field := anonymousFieldType.Field(j)
+					fieldValue := anonymousFieldValue.Field(j)
+					data[columnName(field)] = fieldValue.Interface()
+				}
+				continue
+			}
+			data[columnName(field)] = fieldValue.Interface()
+		}
+		return data
+	case reflect.Map:
+		var data Args
+		for _, key := range value.MapKeys() {
+			data[key.String()] = value.MapIndex(key).Interface()
+		}
+		return data
+	default:
+		panic(fmt.Errorf("AsMap: unsupported type %s", t.Kind()))
+	}
+}
+
+// AsMilliseconds convert duration to milliseconds
+func AsMilliseconds(duration int64) float64 {
+	return float64(duration) / float64(time.Millisecond)
+}
+
+// AsSeconds convert duration to seconds
+func AsSeconds(duration int64) float64 {
+	return float64(duration) / float64(time.Second)
 }
