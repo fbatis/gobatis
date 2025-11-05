@@ -681,10 +681,12 @@ func (b *DB) Bind(variables interface{}) *DB {
 					field := anonymousFieldType.Field(j)
 					fieldValue := anonymousFieldValue.Field(j)
 					variablesMap[b.columnName(field)] = fieldValue.Interface()
+					variablesMap[field.Name] = fieldValue.Interface()
 				}
 				continue
 			}
 			variablesMap[b.columnName(field)] = fieldValue.Interface()
+			variablesMap[field.Name] = fieldValue.Interface()
 		}
 		variables = variablesMap
 	}
