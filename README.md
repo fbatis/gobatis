@@ -248,9 +248,30 @@ type Example struct {
 
 按照顺序解析 `json`, `sql`, `db`, `expr`, `leopard`, `gorm` **tag**，遇到了就作为名称映射，否则使用结构体字段名. 建议大家使用 `json` **tag** 即可, 不用增加复杂度。
 
-**注意**
+**[注意]:**
 
 **gobatis** 支持内嵌结构体映射。
+
+```go
+type BoxCommon struct {
+	Id int `sql:"id"`
+}
+
+type BoxData struct {
+	*BoxCommon
+}
+
+type MOrder struct {
+	BoxData
+	Name      string     `json:"name"`
+	Price     float64    `json:"price"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at"`
+}
+```
+
+**MOrder** 的内嵌结构体 **BoxData**, 以及 内嵌的 **BoxCommon**结构体。
 
 
 ## Postgres 复杂类型支持
@@ -763,6 +784,7 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
   - bitushr(int, int)
 
 * 具体的明细内容参考 expr-lang/expr [Language Definition](https://expr-lang.org/docs/language-definition#float)
+
 
 
 
