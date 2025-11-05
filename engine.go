@@ -963,8 +963,12 @@ func (b *DB) scanType(typ reflect.Type, columns []string, ctypes []*sql.ColumnTy
 }
 
 func (b *DB) scanSlice(rows *sql.Rows, dest any) error {
+	if dest == nil {
+		return ErrorDestCantBeNil
+	}
+
 	v := reflect.ValueOf(dest)
-	if dest == nil || v.IsNil() {
+	if v.IsNil() {
 		return ErrorDestCantBeNil
 	}
 
@@ -1011,14 +1015,18 @@ func (b *DB) scanSlice(rows *sql.Rows, dest any) error {
 }
 
 func (b *DB) scan(rows *sql.Rows, dest any) error {
-	od := reflect.ValueOf(dest)
-	if dest == nil || od.IsNil() {
+	if dest == nil {
 		return ErrorDestCantBeNil
 	}
 
 	ot := reflect.TypeOf(dest)
 	if ot.Kind() != reflect.Pointer {
 		return ErrorInvalidScanRowType
+	}
+
+	od := reflect.ValueOf(dest)
+	if od.IsNil() {
+		return ErrorDestCantBeNil
 	}
 
 	t := ot.Elem()
