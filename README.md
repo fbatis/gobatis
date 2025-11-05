@@ -5,19 +5,17 @@ The fantastic library for golang, aims to be the most powerful and stable ORM.
 
 ## Overview
 
-* support go1.18+
-* use xml file to define sql
-* support complex postgre's type
-* support transaction
-* Logger
-* support insert/update/delete xxxxx returning xxx feature
-* support window function
-* support all SQL features by defining xml
-* use sql/database to execute sql
-    - postgres
-    - mysql
+* 支持 go1.18+
+* 使用 xml 定义 SQL
+* 丰富的 Postgres 类型支持
+* 支持事务
+* 支持日志 Logger 接口
+* 支持 Postgres 类型的 INSERT/UPDATE/DELETE xxx RETURNING xxx 语法
+* 支持 window 窗口函数
+* 使用 sql/database 接口
+    - Postgres
+    - MySQL
     - SQLite
-    - ...
 
 ## Getting Started
 
@@ -714,3 +712,4 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
   - bitushr(int, int)
 
 * 具体的明细内容参考 expr-lang/expr [Language Definition](https://expr-lang.org/docs/language-definition#float)
+
