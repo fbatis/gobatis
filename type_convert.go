@@ -555,3 +555,16 @@ func AsMilliseconds(duration int64) float64 {
 func AsSeconds(duration int64) float64 {
 	return float64(duration) / float64(time.Second)
 }
+
+// Ptr return pointer of v
+func Ptr[T any](v T) *T {
+	return &v
+}
+
+// PtrToValue return the value of pointer
+func PtrToValue[T any](v *T) any {
+	if v == nil {
+		return nil
+	}
+	return *v
+}
