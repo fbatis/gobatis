@@ -188,7 +188,7 @@ if err != nil {
 }
 
 // 增删改操作
-err := tx.RawExec(`select * from m_order where id = ?`, 3).Execute().Error
+err := tx.RawExec(`delete from m_order where id = ?`, 3).Execute().Error
 if err != nil {
 	return err
 }	
@@ -730,6 +730,7 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
   - bitushr(int, int)
 
 * 具体的明细内容参考 expr-lang/expr [Language Definition](https://expr-lang.org/docs/language-definition#float)
+
 
 
 
