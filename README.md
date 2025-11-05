@@ -246,7 +246,11 @@ type Example struct {
 
 正如上面看到的那样, 我们可以使用 `json` **tag** 来让结构体与数据库字段进行映射, 对应的我们也支持更多 `tag`:
 
-`json`, `sql`, `db`, `expr`, `leopard`, `gorm` 都是兼容的. 建议大家使用 `json` **tag** 即可, 不用增加复杂度。
+按照顺序解析 `json`, `sql`, `db`, `expr`, `leopard`, `gorm` **tag**，遇到了就作为名称映射，否则使用结构体字段名. 建议大家使用 `json` **tag** 即可, 不用增加复杂度。
+
+**注意**
+
+**gobatis** 支持内嵌结构体映射。
 
 
 ## Postgres 复杂类型支持
@@ -759,6 +763,7 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
   - bitushr(int, int)
 
 * 具体的明细内容参考 expr-lang/expr [Language Definition](https://expr-lang.org/docs/language-definition#float)
+
 
 
 
