@@ -562,9 +562,10 @@ func Ptr[T any](v T) *T {
 }
 
 // PtrToValue return the value of pointer
-func PtrToValue[T any](v *T) any {
+func PtrToValue[T any](v *T) T {
 	if v == nil {
-		return nil
+		var t T
+		return t
 	}
 	return *v
 }
