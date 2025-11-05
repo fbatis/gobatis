@@ -194,6 +194,35 @@ if err != nil {
 }	
 ```
 
+#### 事务用法 
+```go
+err := db.WithContext(ctx).Transaction(func(tx *gobatis.DB) error {
+	// insert
+	ndb := tx.Mapper(`insertMOrderByValue`).Args(&gobatis.Args{
+		`name`:       `test-value`,
+		`price`:      1000,
+		`created_at`: time.Now().Add(time.Hour * 24 * -1),
+		`updated_at`: time.Now().Add(time.Hour * 6),
+	}).Execute()
+	if ndb.Error != nil {
+		return ndb.Error
+	}
+
+	id := ndb.LastInserId
+
+	// find
+	var two MOrder
+	if err = tx.Mapper(`findMOrderById`).Args(&gobatis.Args{`id`: id}).Find(&two).Error; err != nil {
+		return err
+	}
+	
+	return nil
+})
+if err != nil {
+	panic(err)
+}
+```
+
 
 ## 结构体映射
 
@@ -730,6 +759,7 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
   - bitushr(int, int)
 
 * 具体的明细内容参考 expr-lang/expr [Language Definition](https://expr-lang.org/docs/language-definition#float)
+
 
 
 
