@@ -271,7 +271,7 @@ type MOrder struct {
 }
 ```
 
-**MOrder** 的内嵌结构体 **BoxData** 和 **BoxCommon**结构体。
+**MOrder** 的内嵌 **BoxData** 结构体 和 **BoxCommon**结构体。
 
 
 ## Postgres 复杂类型支持
@@ -784,6 +784,7 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
   - bitushr(int, int)
 
 * 具体的明细内容参考 expr-lang/expr [Language Definition](https://expr-lang.org/docs/language-definition#float)
+
 
 
 
