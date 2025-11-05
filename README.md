@@ -8,6 +8,7 @@ The fantastic library for golang, aims to be the most powerful and stable ORM.
 * 支持 go1.18+
 * 使用 xml 定义 SQL
 * 丰富的 Postgres 类型支持
+* 支持原生 SQL 执行
 * 支持事务
 * 支持日志 Logger 接口
 * 支持所有SQL特性, 避免常规ORM对于复杂SQL的编写复杂度
@@ -134,12 +135,11 @@ import (
     }
     var ctx = context.TODO()
 
-    var data = map[string]interface{}{
+    var out []Employees
+    if err = db.WithContext(ctx).Mapper(`findUser`).Args(&gobatis.Args{
         `employee_id`: []int{38, 39, 40},
         `department`:  2,
-    }
-    var out []Employees
-    if err = db.WithContext(ctx).Mapper(`findUser`).Args(data).Find(&out).Error; err != nil {
+    }).Find(&out).Error; err != nil {
         panic(err)
     } else {
         fmt.Printf("%#v\n", out)
@@ -175,6 +175,23 @@ if err := db.WithContext(ctx).
 	Args(&Gobatis{`id`:1, `name`:`test`}).Execute().Error; err != nil {
 	panic(err)
 }
+```
+
+#### 原生SQL的增删改查
+
+```go
+// 查询操作
+var three MOrder
+err := tx.RawQuery(`select * from m_order where id = ?`, 3).Find(&three).Error
+if err != nil {
+	return err
+}
+
+// 增删改操作
+err := tx.RawExec(`select * from m_order where id = ?`, 3).Execute().Error
+if err != nil {
+	return err
+}	
 ```
 
 
@@ -713,5 +730,6 @@ err = db.WithContext(ctx).Mapper(`insertCard`).
   - bitushr(int, int)
 
 * 具体的明细内容参考 expr-lang/expr [Language Definition](https://expr-lang.org/docs/language-definition#float)
+
 
 
