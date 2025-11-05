@@ -73,6 +73,7 @@ type Logger interface {
 	// param duration: go time.Duration
 	// param sql: prepared sql
 	// param args: prepared sql args.
+	// when level is LogLevelError, args[0] is error.
 	Log(ctx context.Context, level int, duration int64, sql string, args ...any)
 }
 
@@ -405,6 +406,7 @@ func (b *DB) RawExec(query string, args ...any) *DB {
 	var err error
 	var result sql.Result
 	if b.Error != nil {
+		b.logger.Log(b.ctx, LogLevelError, time.Now().Sub(b.startTime).Nanoseconds(), ``, b.Error)
 		return b
 	}
 
@@ -438,6 +440,7 @@ func (b *DB) RawExec(query string, args ...any) *DB {
 // Find  result from previous Query call
 func (b *DB) Find(dest any) *DB {
 	if b.Error != nil {
+		b.logger.Log(b.ctx, LogLevelError, time.Now().Sub(b.startTime).Nanoseconds(), ``,b.Error)
 		return b
 	}
 
