@@ -98,7 +98,7 @@ func (pg *PgRecord) Value() (driver.Value, error) {
 	b.WriteString(`(`)
 	for i, v := range *pg {
 		v = RecordReverseReplacer.Replace(v)
-		if bytes.IndexAny([]byte(v), `, "`) != -1 {
+		if bytes.IndexAny([]byte(v), `, ()\"`) != -1 {
 			v = `"` + v + `"`
 		}
 		b.WriteString(v)
@@ -225,7 +225,7 @@ func (pg *PgArrayRecord) Value() (driver.Value, error) {
 		b.WriteString(`"(`)
 		for j, item := range v {
 			item = ArrayRecordReverseReplacer.Replace(item)
-			if bytes.IndexAny([]byte(item), `, "`) != -1 {
+			if bytes.IndexAny([]byte(item), `, ()\"`) != -1 {
 				item = `\"` + item + `\"`
 			}
 			b.WriteString(item)
