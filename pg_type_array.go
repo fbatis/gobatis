@@ -195,7 +195,7 @@ func (pg *PgArrayString) Value() (driver.Value, error) {
 	b.WriteString(`{`)
 	for i, v := range *pg {
 		v = ArrayStringReverseReplacer.Replace(v)
-		if bytes.IndexAny([]byte(v), `, ()\"`) != -1 {
+		if bytes.IndexAny([]byte(v), `,"`) != -1 {
 			v = `"` + v + `"`
 		}
 		b.WriteString(v)
