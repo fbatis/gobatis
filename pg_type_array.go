@@ -128,7 +128,7 @@ func (pg *PgArrayFloat) Value() (driver.Value, error) {
 type PgArrayString []string
 
 var (
-	ArrayStringReplacer        = strings.NewReplacer(`\"`, `"`)
+	ArrayStringReplacer        = strings.NewReplacer(`\"`, `"`, `\\`, `\`)
 	ArrayStringReverseReplacer = strings.NewReplacer(`"`, `\"`)
 )
 
