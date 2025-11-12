@@ -11,9 +11,9 @@ import (
 // (2,"""\\test","{""\\""\\\\12345678901"",""12345678902\\\\\\\\\\""""}", "[aaaa,bbb)")
 var (
 	PgNewRecordReplacer           = strings.NewReplacer(`\\`, `\`)
-	PgNewArrayRecordReplacer      = strings.NewReplacer(`\\\\`, `\`)
+	PgNewArrayRecordReplacer      = strings.NewReplacer(`\\\\`, `\`, `\\\\\\\\`, `\`)
 	PgNewRecordInnerReplacer      = strings.NewReplacer(`""`, `"`, `\\\\`, `\`, `\\`, ``)
-	PgNewArrayRecordInnerReplacer = strings.NewReplacer(`\"\"`, `"`, `\\\\`, `\`, `\\`, ``)
+	PgNewArrayRecordInnerReplacer = strings.NewReplacer(`\\\\\"\"`, `"`, `\\\\`, `\`, `\\`, ``)
 	DoubleQuoteReplacer           = strings.NewReplacer(`""`, `"`)
 	SlashDoubleQuoteReplacer      = strings.NewReplacer(`\"\"`, `"`, `\\`, `\`)
 
