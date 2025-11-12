@@ -7,7 +7,25 @@ import (
 	"strings"
 )
 
+// ROW(2, '"\test', array['"\12345678901', '12345678902\\"'])
+// (2,"""\\test","{""\\""\\\\12345678901"",""12345678902\\\\\\\\\\""""}", "[aaaa,bbb)")
+var (
+	PgNewRecordReplacer           = strings.NewReplacer(`\\`, `\`)
+	PgNewArrayRecordReplacer      = strings.NewReplacer(`\\\\`, `\`)
+	PgNewRecordInnerReplacer      = strings.NewReplacer(`""`, `"`, `\\\\`, `\`, `\\`, ``)
+	PgNewArrayRecordInnerReplacer = strings.NewReplacer(`\"\"`, `"`, `\\\\`, `\`, `\\`, ``)
+	DoubleQuoteReplacer           = strings.NewReplacer(`""`, `"`)
+	SlashDoubleQuoteReplacer      = strings.NewReplacer(`\"\"`, `"`, `\\`, `\`)
+
+	RecordReverseReplacer      = strings.NewReplacer(`"`, `""`, `\`, `\\`)
+	ArrayRecordReverseReplacer = strings.NewReplacer(`"`, `\\\\\"\"`, `\`, `\\\\`)
+)
+
 // PgRecord postgres record type
+// caller should use this method as inner value to parse value into field.
+// each field should be string, array, record, range type.
+// user should convert to the real type.
+//
 // caller should use this method as inner value to parse value into field.
 // like this:
 //
@@ -34,61 +52,127 @@ import (
 //	}
 type PgRecord []string
 
-var (
-	RecordReplacer        = strings.NewReplacer(`""`, `"`, `",`, ``, `")`, ``)
-	RecordReverseReplacer = strings.NewReplacer(`"`, `""`)
-)
-
 // Scan sql/database Scan interface
 func (pg *PgRecord) Scan(value any) error {
 	scan, err := fetchScanner(value)
-	if scan == nil || err != nil {
+	if err != nil || scan == nil {
 		return err
 	}
-
-	var builder strings.Builder
-	builder.Grow(32)
 	scan.Split(SplitPgRecordType)
+
 	for scan.Scan() {
 		text := scan.Text()
 		if text != `(` {
 			continue
 		}
-
+	nextField:
 		for scan.Scan() {
 			text = scan.Text()
 
+			field := strings.Builder{}
+			field.Grow(32)
 			if text == `"` {
-				builder.Reset()
+				// inner text
+				// in inner text, " should be escaped with double quote
+				// in this mode, we can meet array or range type, also the normal string type values
 				for scan.Scan() {
 					text = scan.Text()
-					builder.WriteString(text)
-					if strings.HasSuffix(builder.String(), `",`) {
-						*pg = append(*pg, RecordReplacer.Replace(builder.String()))
-						break
-					}
-					if strings.HasSuffix(builder.String(), `")`) {
-						*pg = append(*pg, RecordReplacer.Replace(builder.String()))
-						break
+					switch text {
+					case `{`: // array of values
+						field.WriteString(text)
+						for scan.Scan() {
+							text = scan.Text()
+							field.WriteString(text)
+							if strings.HasSuffix(field.String(), `}"`) {
+								for scan.Scan() {
+									text = scan.Text()
+									switch text {
+									case `,`:
+										*pg = append(*pg, DoubleQuoteReplacer.Replace(PgNewRecordInnerReplacer.Replace(field.String()[:field.Len()-1])))
+										goto nextField
+									case `)`:
+										*pg = append(*pg, DoubleQuoteReplacer.Replace(PgNewRecordInnerReplacer.Replace(field.String()[:field.Len()-1])))
+										return nil
+									default:
+										continue
+									}
+								}
+								goto errorInvalidPgTypeRecord
+							}
+						}
+						goto errorInvalidPgTypeRecord
+					case `[`: // range of values
+						fallthrough
+					case `(`: // range of but also record type values
+						field.WriteString(text)
+						for scan.Scan() {
+							text = scan.Text()
+							field.WriteString(text)
+							if strings.HasSuffix(field.String(), `]"`) ||
+								strings.HasSuffix(field.String(), `)"`) {
+								for scan.Scan() {
+									text = scan.Text()
+									switch text {
+									case `,`:
+										*pg = append(*pg, DoubleQuoteReplacer.Replace(PgNewRecordInnerReplacer.Replace(field.String()[:field.Len()-1])))
+										goto nextField
+									case `)`:
+										*pg = append(*pg, DoubleQuoteReplacer.Replace(PgNewRecordInnerReplacer.Replace(field.String()[:field.Len()-1])))
+										return nil
+									default:
+										continue
+									}
+								}
+								goto errorInvalidPgTypeRecord
+							}
+						}
+						goto errorInvalidPgTypeRecord
+					default:
+						for scan.Scan() {
+							text = scan.Text()
+							switch text {
+							case `,`:
+								if strings.HasSuffix(field.String(), `"`) {
+									*pg = append(*pg, PgNewRecordReplacer.Replace(field.String()[:field.Len()-1]))
+									goto nextField
+								}
+							case `)`:
+								if strings.HasSuffix(field.String(), `"`) {
+									*pg = append(*pg, PgNewRecordReplacer.Replace(field.String()[:field.Len()-1]))
+									return nil
+								}
+							}
+							field.WriteString(text)
+						}
+						goto errorInvalidPgTypeRecord
 					}
 				}
-				continue
+				goto errorInvalidPgTypeRecord
+			} else {
+				// row value
+				field.WriteString(text)
 			}
 
-			if text == `,` {
-				continue
+			// we need next string is , or )
+			for scan.Scan() {
+				text = scan.Text()
+				switch text {
+				case `,`:
+					*pg = append(*pg, field.String())
+					goto nextField
+				case `)`:
+					*pg = append(*pg, field.String())
+					return nil
+				default:
+					continue
+				}
 			}
-			if text == `)` {
-				break
-			}
-			*pg = append(*pg, text)
-		}
-
-		if text == `)` {
-			return nil
+			goto errorInvalidPgTypeRecord
 		}
 	}
-	return errors.New(`gobatis: value not record`)
+
+errorInvalidPgTypeRecord:
+	return errors.New(`gobatis: values not valid record type or can't parse correctly.'`)
 }
 
 // Value sql/database Value interface
@@ -98,7 +182,7 @@ func (pg *PgRecord) Value() (driver.Value, error) {
 	b.WriteString(`(`)
 	for i, v := range *pg {
 		v = RecordReverseReplacer.Replace(v)
-		if bytes.IndexAny([]byte(v), `, "`) != -1 {
+		if bytes.IndexAny([]byte(v), `, (){}[]\"`) != -1 {
 			v = `"` + v + `"`
 		}
 		b.WriteString(v)
@@ -110,13 +194,16 @@ func (pg *PgRecord) Value() (driver.Value, error) {
 	return b.String(), nil
 }
 
-// PgArrayRecord postgresql array record
-type PgArrayRecord [][]string
+// array[
+//  row(1, 'test\\', array['12345678901\\', '12345678902']),
+//  row(1, 'test', array['12345678901', '12345678902'])
+//  ]::address[]
+// {
+//  "(1,\"test\\\\\\\\\",\"{\"\"12345678901\\\\\\\\\\\\\\\\\"\",12345678902}\")",
+//  "(1,test,\"{12345678901,12345678902}\")"
+// }
 
-var (
-	ArrayRecordReplacer        = strings.NewReplacer(`\"\"`, `"`, `\",`, ``, `\")`, ``, `\\\\`, `\`)
-	ArrayRecordReverseReplacer = strings.NewReplacer(`"`, `\"\"`, `\`, `\\\\`)
-)
+type PgArrayRecord []PgRecord
 
 // Scan sql/database Scan interface
 func (pg *PgArrayRecord) Scan(value any) error {
@@ -124,95 +211,161 @@ func (pg *PgArrayRecord) Scan(value any) error {
 	if scan == nil || err != nil {
 		return err
 	}
-
-	scan.Split(SplitPgArrayRecordType)
-	var recordItem []string
-	var detail strings.Builder
+	scan.Split(SplitByStringWithPrefix("{}(,\")", []string{`\"`}))
 
 	for scan.Scan() {
 		text := scan.Text()
 		if text != `{` {
-			goto errorRecordArrayType
+			continue
 		}
-
 	nextRecord:
-		recordItem = nil
 		for scan.Scan() {
 			text = scan.Text()
 			if text != `"` {
 				continue
 			}
 
-			if !scan.Scan() {
-				goto errorRecordArrayType
-			}
-			text = scan.Text()
-			if text != `(` {
-				goto errorRecordArrayType
-			}
-
+			record := PgRecord{}
 			for scan.Scan() {
 				text = scan.Text()
+				if text != `(` {
+					continue
+				}
 
-				if text == `\` {
-					detail.Reset()
+			nextField:
+				for scan.Scan() {
+					text = scan.Text()
+
+					field := strings.Builder{}
+					field.Grow(32)
+					if text == `\"` {
+						// inner text
+						// in inner text, " should be escaped with double-double quote escape
+						for scan.Scan() {
+							text = scan.Text()
+							switch text {
+							case `{`: // array of values
+								field.WriteString(text)
+								for scan.Scan() {
+									text = scan.Text()
+									field.WriteString(text)
+									if strings.HasSuffix(field.String(), `}\"`) {
+										for scan.Scan() {
+											text = scan.Text()
+											switch text {
+											case `,`:
+												record = append(record, SlashDoubleQuoteReplacer.Replace(PgNewArrayRecordInnerReplacer.Replace(field.String()[:field.Len()-2])))
+												goto nextField
+											case `)`:
+												record = append(record, SlashDoubleQuoteReplacer.Replace(PgNewArrayRecordInnerReplacer.Replace(field.String()[:field.Len()-2])))
+												goto endOrNext
+											default:
+												continue
+											}
+										}
+										goto errorInvalidArrayRecordType
+									}
+								}
+								goto errorInvalidArrayRecordType
+							case `[`: // range of values
+								fallthrough
+							case `(`: // range of but also record type values
+								field.WriteString(text)
+								for scan.Scan() {
+									text = scan.Text()
+									field.WriteString(text)
+									if strings.HasSuffix(field.String(), `]\"`) ||
+										strings.HasSuffix(field.String(), `)\"`) {
+										for scan.Scan() {
+											text = scan.Text()
+											switch text {
+											case `,`:
+												record = append(record, SlashDoubleQuoteReplacer.Replace(PgNewArrayRecordInnerReplacer.Replace(field.String()[:field.Len()-2])))
+												goto nextField
+											case `)`:
+												record = append(record, SlashDoubleQuoteReplacer.Replace(PgNewArrayRecordInnerReplacer.Replace(field.String()[:field.Len()-2])))
+												goto endOrNext
+											default:
+												continue
+											}
+										}
+										goto errorInvalidArrayRecordType
+									}
+								}
+								goto errorInvalidArrayRecordType
+							default:
+								field.WriteString(text)
+								for scan.Scan() {
+									text = scan.Text()
+									switch text {
+									case `,`:
+										if strings.HasSuffix(field.String(), `\"`) {
+											record = append(record, PgNewArrayRecordReplacer.Replace(field.String()[:field.Len()-2]))
+											goto nextField
+										}
+									case `)`:
+										if strings.HasSuffix(field.String(), `\"`) {
+											record = append(record, PgNewArrayRecordReplacer.Replace(field.String()[:field.Len()-2]))
+											goto endOrNext
+										}
+									}
+									field.WriteString(text)
+								}
+								goto errorInvalidArrayRecordType
+							}
+						}
+						goto errorInvalidArrayRecordType
+					} else {
+						// row value
+						field.WriteString(text)
+					}
+
+					// we need next string is , or )
+					for scan.Scan() {
+						text = scan.Text()
+						switch text {
+						case `,`:
+							record = append(record, PgNewArrayRecordReplacer.Replace(field.String()))
+							goto nextField
+						case `)`:
+							record = append(record, PgNewArrayRecordReplacer.Replace(field.String()))
+							goto endOrNext
+						default:
+							continue
+						}
+					}
+
+				endOrNext:
 					for scan.Scan() {
 						text = scan.Text()
 						if text != `"` {
 							continue
 						}
 
-						// text body
 						for scan.Scan() {
 							text = scan.Text()
-							detail.WriteString(text)
-
-							if strings.HasSuffix(detail.String(), `\",`) {
-								goto addItem
-							} else if strings.HasSuffix(detail.String(), `\")`) {
-								goto addItem
+							switch text {
+							case `,`:
+								*pg = append(*pg, record)
+								goto nextRecord
+							case `}`:
+								*pg = append(*pg, record)
+								return nil
+							default:
+								continue
 							}
 						}
-						goto errorRecordArrayType
 					}
-				}
-			addItem:
-				if text == `,` {
-					recordItem = append(recordItem, ArrayRecordReplacer.Replace(detail.String()))
-					detail.Reset()
-					continue
-				}
-				if text == `)` {
-					recordItem = append(recordItem, ArrayRecordReplacer.Replace(detail.String()))
-					detail.Reset()
-					break
-				}
-
-				detail.WriteString(text)
-			}
-
-			for scan.Scan() {
-				text = scan.Text()
-				if text == `"` {
-					continue
-				}
-				if text == `,` {
-					*pg = append(*pg, recordItem)
-					goto nextRecord
-				}
-				if text == `}` {
-					break
+					goto errorInvalidArrayRecordType
 				}
 			}
-		}
 
-		if text == `}` {
-			*pg = append(*pg, recordItem)
-			return nil
+			goto errorInvalidArrayRecordType
 		}
 	}
-errorRecordArrayType:
-	return errors.New(`gobatis: value not record[]`)
+
+errorInvalidArrayRecordType:
+	return errors.New(`gobatis: values not valid array record type or can't parse correctly.'`)
 }
 
 // Value sql/database Value interface
@@ -225,7 +378,7 @@ func (pg *PgArrayRecord) Value() (driver.Value, error) {
 		b.WriteString(`"(`)
 		for j, item := range v {
 			item = ArrayRecordReverseReplacer.Replace(item)
-			if bytes.IndexAny([]byte(item), `, "`) != -1 {
+			if bytes.IndexAny([]byte(item), `, (){}[]\"`) != -1 {
 				item = `\"` + item + `\"`
 			}
 			b.WriteString(item)
