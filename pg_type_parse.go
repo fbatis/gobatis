@@ -18,7 +18,7 @@ var (
 	SplitPgRecordType = SplitByString(`(,")`)
 
 	// SplitPgArrayRecordType split string used by bufio.Scanner Split func
-	SplitPgArrayRecordType = SplitByString(`{}(,")`)
+	SplitPgArrayRecordType = SplitByString("{}(,\")")
 
 	// SplitPgPointType split string used by bufio.Scanner Split func
 	SplitPgPointType = SplitByString(`(,)`)
@@ -43,6 +43,9 @@ var (
 
 	// SplitPgArrayRangeType split string used by bufio.Scanner Split func
 	SplitPgArrayRangeType = SplitByString(`{"[(,)]}`)
+
+	// SplitMoreCharsPrefix every prefix in the SplitMoreCharsPrefix will be split togother.
+	SplitMoreCharsPrefix = []string{`\"`}
 )
 
 // SplitByString split string used by bufio.Scanner Split func
@@ -54,14 +57,38 @@ func SplitByString(chars string) func(data []byte, atEOF bool) (advance int, tok
 		}
 
 		if i := bytes.IndexAny(data, chars); i >= 0 {
-			for _, char := range []byte(chars) {
-				if data[i] == char {
-					if i > 0 {
-						return i, dropCR(data[:i]), nil
-					} else {
-						return i + 1, []byte{data[i]}, nil
-					}
-				}
+			if i > 0 {
+				return i, dropCR(data[:i]), nil
+			} else {
+				return i + 1, []byte{data[i]}, nil
+			}
+		}
+
+		if atEOF {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
+	}
+}
+
+// SplitByStringWithPrefix split string used by bufio.Scanner Split func
+// any char in chars will be split and return
+func SplitByStringWithPrefix(chars string, prefixs []string) func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	return func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		if atEOF && len(data) == 0 {
+			return 0, nil, nil
+		}
+
+		for _, prefix := range prefixs {
+			if bytes.HasPrefix(data, []byte(prefix)) {
+				return len(prefix), dropCR(data[:len(prefix)]), nil
+			}
+		}
+		if i := bytes.IndexAny(data, chars); i >= 0 {
+			if i > 0 {
+				return i, dropCR(data[:i]), nil
+			} else {
+				return i + 1, []byte{data[i]}, nil
 			}
 		}
 
