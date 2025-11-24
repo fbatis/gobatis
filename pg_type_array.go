@@ -272,3 +272,62 @@ func (pg *PgArrayBool) Value() (driver.Value, error) {
 	b.WriteString(`}`)
 	return b.String(), nil
 }
+
+
+// PgVectorFloat postgresql array float
+// Prices []float64
+// which Prices was PgArrayFloat type
+type PgVectorFloat []float64
+
+// Scan sql/database Scan interface
+func (pg *PgVectorFloat) Scan(value any) error {
+	scan, err := fetchScanner(value)
+	if scan == nil || err != nil {
+		return err
+	}
+
+	scan.Split(SplitPgVectorType)
+	for scan.Scan() {
+		text := scan.Text()
+		if text != `[` {
+			continue
+		}
+
+		for scan.Scan() {
+			text = scan.Text()
+			if text == `,` {
+				continue
+			}
+			if text == `]` {
+				break
+			}
+
+			num, err := strconv.ParseFloat(text, 64)
+			if err != nil {
+				return err
+			}
+			*pg = append(*pg, num)
+		}
+
+		if text == `]` {
+			return nil
+		}
+	}
+	return errors.New(`gobatis: value not float[]`)
+}
+
+// Value sql/database Value interface
+func (pg *PgVectorFloat) Value() (driver.Value, error) {
+	var b strings.Builder
+	b.Grow(len(*pg) * 3)
+	b.WriteString(`[`)
+	for i, v := range *pg {
+		b.WriteString(strconv.FormatFloat(v, 'f', -2, 64))
+		if i != len(*pg)-1 {
+			b.WriteString(`,`)
+		}
+	}
+	b.WriteString(`]`)
+	return b.String(), nil
+}
+
